@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.*
 import com.example.misuper.ui.screens.inicio.HomeScreen
+import com.example.misuper.ui.screens.lista.ListaScreen
 import com.example.misuper.ui.theme.*
 
 class MainActivity : ComponentActivity() {
@@ -115,11 +116,6 @@ fun BottomBar(navController: NavController) {
             }
         }
     }
-}
-
-@Composable
-fun ListaScreen() {
-    Text("LISTA")
 }
 
 @Composable
