@@ -205,6 +205,10 @@ fun SelectorItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
 
 @Composable
 fun BudgetHero() {
+    val budget = 120000.0
+    val spent = 84200.0
+    val ratio = (spent / budget).toFloat()
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -225,22 +229,36 @@ fun BudgetHero() {
                 drawArc(
                     color = Emerald500,
                     startAngle = -90f,
-                    sweepAngle = 240f,
+                    sweepAngle = 360f * ratio,
                     useCenter = false,
                     style = Stroke(width = 12.dp.toPx())
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "ahorrado",
-                    style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 12.sp)
+                    "PRESUPUESTO",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Slate400,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
                 )
                 Text(
-                    "$84.200",
+                    "$120.000",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         color = Slate50,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Ahorrado: $35.800",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Emerald500,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
                     )
                 )
             }

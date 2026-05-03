@@ -15,6 +15,7 @@ val Slate950 = Color(0xFF020617) // Deep Dark Background
 val Slate900 = Color(0xFF0F172A) // Cards and Containers
 val Slate800 = Color(0xFF1E293B) // Borders and Elevations
 val Slate700 = Color(0xFF334155) // Active Filter Background
+val Slate600 = Color(0xFF475569) // Placeholders
 val Slate500 = Color(0xFF64748B) // Inactive Filter Text
 val Slate400 = Color(0xFF94A3B8) // Secondary Text
 val Slate100 = Color(0xFFF1F5F9) // Product Names

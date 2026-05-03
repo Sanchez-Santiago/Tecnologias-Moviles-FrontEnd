@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,6 +22,9 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.*
 import com.example.misuper.ui.screens.inicio.HomeScreen
 import com.example.misuper.ui.screens.lista.ListaScreen
+import com.example.misuper.ui.screens.mapa.MapScreen
+import com.example.misuper.ui.screens.profile.ProfileScreen
+import com.example.misuper.ui.screens.tickets.TicketsScreen
 import com.example.misuper.ui.theme.*
 
 class MainActivity : ComponentActivity() {
@@ -118,17 +122,4 @@ fun BottomBar(navController: NavController) {
     }
 }
 
-@Composable
-fun TicketsScreen() {
-    Text("TICKETS")
-}
 
-@Composable
-fun MapScreen() {
-    Text("MAPA")
-}
-
-@Composable
-fun ProfileScreen() {
-    Text("PERFIL")
-}
