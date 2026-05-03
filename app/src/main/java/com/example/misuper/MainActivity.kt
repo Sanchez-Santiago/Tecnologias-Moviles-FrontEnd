@@ -4,24 +4,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import com.example.misuper.ui.theme.MiSuperTheme
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.RequestPage
 import com.example.misuper.ui.screens.inicio.HomeScreen
+import com.example.misuper.ui.theme.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,7 +33,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 
 @Composable
 fun MainScreen() {
@@ -50,12 +48,11 @@ fun MainScreen() {
             startDestination = "INICIO",
             modifier = Modifier.padding(padding)
         ) {
-
             composable("INICIO") { HomeScreen() }
             composable("LISTA") { ListaScreen() }
             composable("TICKETS") { TicketsScreen() }
             composable("MAPA") { MapScreen() }
-            composable("Perfil") { ProfileScreen() }
+            composable("PERFIL") { ProfileScreen() }
         }
     }
 }
@@ -65,41 +62,58 @@ fun BottomBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    NavigationBar {
-        NavigationBarItem(
-            selected = currentDestination?.route == "INICIO",
-            onClick = { navController.navigate("INICIO") },
-            icon = { Icon(Icons.Filled.Home, null) },
-            label = { Text("Inicio") }
-        )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Slate900.copy(alpha = 0.9f),
+        border = BorderStroke(1.dp, Slate800)
+    ) {
+        NavigationBar(
+            containerColor = Color.Transparent,
+            tonalElevation = 0.dp
+        ) {
+            val items = listOf(
+                Triple("INICIO", Icons.Filled.Home, "INICIO"),
+                Triple("LISTA", Icons.Filled.ShoppingCart, "LISTA"),
+                Triple("TICKETS", Icons.Filled.RequestPage, "TICKETS"),
+                Triple("MAPA", Icons.Filled.LocationOn, "MAPA"),
+                Triple("PERFIL", Icons.Filled.Person, "PERFIL")
+            )
 
-        NavigationBarItem(
-            selected = currentDestination?.route == "LISTA",
-            onClick = { navController.navigate("LISTA") },
-            icon = { Icon(Icons.Filled.ShoppingCart, null) },
-            label = { Text("Lista") }
-        )
-
-        NavigationBarItem(
-            selected = currentDestination?.route == "TICKETS",
-            onClick = { navController.navigate("TICKETS") },
-            icon = { Icon(Icons.Filled.RequestPage, null) },
-            label = { Text("Tickets") }
-        )
-
-        NavigationBarItem(
-            selected = currentDestination?.route == "MAPA",
-            onClick = { navController.navigate("MAPA") },
-            icon = { Icon(Icons.Filled.LocationOn, null) },
-            label = { Text("Mapa") }
-        )
-
-        NavigationBarItem(
-            selected = currentDestination?.route == "PERFIL",
-            onClick = { navController.navigate("PERFIL") },
-            icon = { Icon(Icons.Filled.Person, null) },
-            label = { Text("Perfil") }
-        )
+            items.forEach { (route, icon, label) ->
+                val selected = currentDestination?.route == route
+                NavigationBarItem(
+                    selected = selected,
+                    onClick = {
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                            tint = if (selected) White else Slate400
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (selected) White else Slate400
+                            )
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = Color.Transparent
+                    )
+                )
+            }
+        }
     }
 }
 

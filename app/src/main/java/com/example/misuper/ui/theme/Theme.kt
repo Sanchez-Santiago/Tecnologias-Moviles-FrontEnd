@@ -12,32 +12,47 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = Emerald500,
+    secondary = Blue500,
+    tertiary = Indigo600,
+    background = Slate950,
+    surface = Slate900,
+    onPrimary = Slate950,
+    onSecondary = Slate950,
+    onTertiary = Slate950,
+    onBackground = Slate50,
+    onSurface = Slate50,
+    outline = Slate800,
+    surfaceVariant = Slate900,
+    onSurfaceVariant = Slate400,
+    error = Rose500,
+    onError = White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = Emerald600,
+    secondary = Blue600,
+    tertiary = Indigo600,
+    background = White,
+    surface = Slate50,
+    onPrimary = White,
+    onSecondary = White,
+    onTertiary = White,
+    onBackground = Slate950,
+    onSurface = Slate950,
+    outline = Slate400,
+    surfaceVariant = White,
+    onSurfaceVariant = Slate800,
+    error = Rose600,
+    onError = White
 )
 
 @Composable
 fun MiSuperTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Setting default to false to prioritize the custom Emerald/Slate palette
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
