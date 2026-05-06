@@ -27,7 +27,7 @@ class AppRepository(private val storage: JsonStorage) {
     // CARGA INICIAL
     // ----------------------
 
-    suspend fun cargarTodo() = withContext(Dispatchers.IO) {
+    suspend fun cargarTodo() {
         val data = storage.cargar()
 
         if (data != null) {
@@ -99,7 +99,7 @@ class AppRepository(private val storage: JsonStorage) {
     // GUARDADO
     // ----------------------
 
-    suspend fun guardarTodo() = withContext(Dispatchers.IO) {
+    suspend fun guardarTodo() {
         val data = AppData(
             presupuestos = presupuestos.toList(),
             listas = listas.toList(),

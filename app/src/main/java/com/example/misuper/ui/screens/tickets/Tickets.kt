@@ -1,8 +1,12 @@
 package com.example.misuper.ui.screens.tickets
 
 import android.app.DatePickerDialog
+import android.content.ContentValues
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -34,9 +38,12 @@ import androidx.compose.ui.unit.sp
 import com.example.misuper.data.model.MetodoPago
 import com.example.misuper.data.model.Ticket
 import com.example.misuper.data.model.TicketProducto
+import com.example.misuper.ui.components.TicketsSkeleton
 import com.example.misuper.ui.screens.inicio.ModeSelector
 import com.example.misuper.ui.theme.*
 import com.example.misuper.viewmodel.AppViewModel
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -56,6 +63,9 @@ fun TicketsScreen(viewModel: AppViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (viewModel.isLoading) {
+            TicketsSkeleton()
+        } else {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
@@ -97,6 +107,7 @@ fun TicketsScreen(viewModel: AppViewModel) {
                     )
                 }
             }
+        }
         }
 
         if (showModal) {
@@ -358,12 +369,57 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            if (ticket.imagenPath.contains(".pdf")) Icons.Default.PictureAsPdf else Icons.Default.Image,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(64.dp)
-                        )
+                        if (ticket.imagenPath.startsWith("content://") || ticket.imagenPath.startsWith("file://")) {
+                            // Es una URI (galería o archivo seleccionado)
+                            val context = LocalContext.current
+                            val bitmap = remember(ticket.imagenPath) {
+                                try {
+                                    val uri = Uri.parse(ticket.imagenPath)
+                                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                        android.graphics.BitmapFactory.decodeStream(inputStream)
+                                    }
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Comprobante",
+                                    modifier = Modifier.fillMaxSize().padding(16.dp)
+                                )
+                            } else {
+                                Icon(Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(64.dp))
+                            }
+                        } else if (ticket.imagenPath.isNotEmpty()) {
+                            // Es un archivo guardado internamente
+                            val context = LocalContext.current
+                            val bitmap = remember(ticket.imagenPath) {
+                                try {
+                                    context.openFileInput(ticket.imagenPath).use { inputStream ->
+                                        android.graphics.BitmapFactory.decodeStream(inputStream)
+                                    }
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Comprobante",
+                                    modifier = Modifier.fillMaxSize().padding(16.dp)
+                                )
+                            } else {
+                                Icon(
+                                    if (ticket.imagenPath.contains(".pdf")) Icons.Default.PictureAsPdf else Icons.Default.Image,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(64.dp)
+                                )
+                            }
+                        } else {
+                            Text("No hay comprobante adjunto", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             },
@@ -409,8 +465,56 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
     var supermarket by remember { mutableStateOf(ticketToEdit?.supermercado ?: "") }
     var dateMillis by remember { mutableLongStateOf(ticketToEdit?.fechaHora ?: System.currentTimeMillis()) }
     var total by remember { mutableStateOf(ticketToEdit?.total?.toString() ?: "") }
-    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var savedImagePath by remember { mutableStateOf<String?>(null) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    
+    // Helper function to save bitmap to gallery (must be called from non-composable context)
+    fun saveBitmapToGallery(bitmap: Bitmap, context: Context): String {
+        // Save to internal storage
+        val filename = "ticket_${UUID.randomUUID()}.jpg"
+        context.openFileOutput(filename, Context.MODE_PRIVATE).use { fos ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+        }
+        
+        // Also save to public gallery (Pictures/MiSuper)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MiSuper")
+            }
+            val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            uri?.let {
+                context.contentResolver.openOutputStream(it)?.use { os ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, os as java.io.OutputStream)
+                }
+            }
+        } else {
+            val picturesDir = File("/storage/emulated/0/Pictures/MiSuper")
+            if (!picturesDir.exists()) picturesDir.mkdirs()
+            val file = File(picturesDir, filename)
+            FileOutputStream(file).use { fos ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+            }
+            // Notify gallery
+            val mediaScanIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+            mediaScanIntent.data = Uri.fromFile(file)
+            context.sendBroadcast(mediaScanIntent)
+        }
+        
+        return filename
+    }
+    
+    // Helper function to copy image from gallery
+    fun copyImageFromGallery(uri: Uri): String {
+        val filename = "ticket_${UUID.randomUUID()}.jpg"
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            context.openFileOutput(filename, Context.MODE_PRIVATE).use { output ->
+                input.copyTo(output)
+            }
+        }
+        return filename
+    }
 
     val datePicker = DatePickerDialog(
         context,
@@ -427,15 +531,21 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
-        capturedBitmap = bitmap
-        selectedUri = null
+        if (bitmap != null) {
+            val path = saveBitmapToGallery(bitmap, context)
+            savedImagePath = path
+            selectedUri = null
+        }
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        selectedUri = uri
-        capturedBitmap = null
+        if (uri != null) {
+            val path = copyImageFromGallery(uri)
+            savedImagePath = path
+            selectedUri = uri // Keep URI for preview
+        }
     }
 
     val isValid = supermarket.isNotBlank() && total.isNotBlank()
@@ -536,11 +646,11 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             .clip(RoundedCornerShape(16.dp))
                             .clickable { cameraLauncher.launch(null) },
                         shape = RoundedCornerShape(16.dp),
-                        color = if (capturedBitmap != null) Emerald600.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, if (capturedBitmap != null) Emerald500 else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        color = if (savedImagePath != null) Emerald600.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, if (savedImagePath != null) Emerald500 else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            if (capturedBitmap != null) {
+                            if (savedImagePath != null) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CheckCircle, null, tint = Emerald500, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -580,7 +690,7 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                 }
                 
                 // Preview
-                if (capturedBitmap != null || selectedUri != null) {
+                if (savedImagePath != null || selectedUri != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -590,17 +700,63 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (capturedBitmap != null) {
-                            Image(
-                                bitmap = capturedBitmap!!.asImageBitmap(),
-                                contentDescription = "Vista previa",
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Description, null, tint = Blue500)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Archivo seleccionado", color = MaterialTheme.colorScheme.onSurface)
+                        when {
+                            savedImagePath != null -> {
+                                val context = LocalContext.current
+                                val bitmap = remember(savedImagePath) {
+                                    try {
+                                        context.openFileInput(savedImagePath).use { inputStream ->
+                                            android.graphics.BitmapFactory.decodeStream(inputStream)
+                                        }
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = "Vista previa",
+                                        modifier = Modifier.fillMaxSize().padding(16.dp)
+                                    )
+                                } else {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Image, null, tint = Blue500)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Imagen guardada", color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                            savedImagePath != null -> {
+                                val context = LocalContext.current
+                                val bitmap = remember(savedImagePath) {
+                                    try {
+                                        context.openFileInput(savedImagePath).use { inputStream ->
+                                            android.graphics.BitmapFactory.decodeStream(inputStream)
+                                        }
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = "Vista previa",
+                                        modifier = Modifier.fillMaxSize().padding(16.dp)
+                                    )
+                                } else {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Image, null, tint = Blue500)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Imagen guardada", color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                            selectedUri != null -> {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AttachFile, null, tint = Blue500)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Archivo seleccionado", color = MaterialTheme.colorScheme.onSurface)
+                                }
                             }
                         }
                     }
@@ -610,15 +766,13 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = {
+                onClick = { 
                     if (isValid) {
                         val cleanPrice = total.filter { it.isDigit() }.toIntOrNull() ?: 0
                         
-                        val path = capturedBitmap?.let { "camera_img_${UUID.randomUUID()}" } 
-                                 ?: selectedUri?.toString() 
-                                 ?: ticketToEdit?.imagenPath 
-                                 ?: ""
-
+                        // Use the saved image path
+                        val path = savedImagePath ?: selectedUri?.toString() ?: ticketToEdit?.imagenPath ?: ""
+                        
                         val ticket = Ticket(
                             id = ticketToEdit?.id ?: UUID.randomUUID().toString(),
                             supermercado = supermarket,
@@ -627,7 +781,7 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             total = cleanPrice,
                             metodoPago = ticketToEdit?.metodoPago ?: MetodoPago.EFECTIVO,
                             imagenPath = path,
-                            presupuestoId = ticketToEdit?.presupuestoId ?: "", // El repo asignará el activo si es nuevo
+                            presupuestoId = ticketToEdit?.presupuestoId ?: "",
                             productos = ticketToEdit?.productos ?: emptyList()
                         )
                         if (ticketToEdit == null) {

@@ -31,12 +31,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var themeMode by mutableStateOf(ThemeMode.SYSTEM)
         private set
 
+    var isLoading by mutableStateOf(true)
+        private set
+
     init {
         cargarDatos()
     }
 
     private fun cargarDatos() {
         viewModelScope.launch {
+            isLoading = true
             repository.cargarTodo()
 
             presupuestos.clear()
@@ -52,6 +56,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             usuarios.addAll(repository.usuarios)
 
             themeMode = repository.themeMode
+            isLoading = false
         }
     }
 

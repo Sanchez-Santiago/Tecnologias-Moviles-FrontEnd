@@ -107,7 +107,7 @@ fun ProfileScreen(viewModel: AppViewModel, navController: NavController? = null)
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        presupuestos.forEach { p ->
+                        viewModel.presupuestos.forEach { p ->
                             BudgetStatCard(
                                 title = p.nombre,
                                 total = p.montoTotal,

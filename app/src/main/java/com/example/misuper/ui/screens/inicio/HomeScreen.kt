@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.misuper.data.model.Categoria
 import com.example.misuper.data.model.Presupuesto
 import com.example.misuper.data.model.Usuario
+import com.example.misuper.ui.components.HomeSkeleton
 import com.example.misuper.ui.theme.*
 import com.example.misuper.viewmodel.AppViewModel
 import java.text.SimpleDateFormat
@@ -42,76 +43,91 @@ fun HomeScreen(
         .sortedByDescending { it.fechaHora }
         .take(3)
 
+    // Calculate budget warning state
+    val isCritical = remember(presupuestoActivo) {
+        derivedStateOf {
+            if (presupuestoActivo != null && presupuestoActivo.montoTotal > 0) {
+                val gastado = presupuestoActivo.montoTotal - presupuestoActivo.montoDisponible
+                val porcentajeGastado = (gastado.toFloat() / presupuestoActivo.montoTotal) * 100
+                porcentajeGastado > 90f // Less than 10% available
+            } else false
+        }
+    }.value
+
     Scaffold(
-        topBar = { Header(onNavigateToNotifications) },
+        topBar = { Header(onNavigateToNotifications, isCritical) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(32.dp),
-            contentPadding = PaddingValues(bottom = 100.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-            
-            item { 
-                ModeSelector(
-                    activeId = presupuestoActivo?.id ?: "",
-                    onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
-                ) 
-            }
+        if (viewModel.isLoading) {
+            HomeSkeleton()
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(32.dp),
+                contentPadding = PaddingValues(bottom = 100.dp)
+            ) {
+                item { Spacer(modifier = Modifier.height(8.dp)) }
+                
+                item { 
+                    ModeSelector(
+                        activeId = presupuestoActivo?.id ?: "",
+                        onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
+                    ) 
+                }
 
-            item { 
-                presupuestoActivo?.let { presupuesto ->
-                    val listaId = if (presupuesto.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
-                    val estimados = viewModel.getEstimadosPorCategoria(listaId)
-                    
-                    BudgetHero(
-                        presupuesto = presupuesto,
-                        estimados = estimados,
-                        onEditBudget = { nuevoMonto ->
-                            viewModel.actualizarPresupuesto(presupuesto.id, nuevoMonto)
-                        }
+                item { 
+                    presupuestoActivo?.let { presupuesto ->
+                        val listaId = if (presupuesto.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
+                        val estimados = viewModel.getEstimadosPorCategoria(listaId)
+                        
+                        BudgetHero(
+                            presupuesto = presupuesto,
+                            estimados = estimados,
+                            onEditBudget = { nuevoMonto ->
+                                viewModel.actualizarPresupuesto(presupuesto.id, nuevoMonto)
+                            }
+                        )
+                    }
+                }
+
+                item { 
+                    NewMembersSection(
+                        members = viewModel.usuarios,
+                        onAddClick = onNavigateToFamily
                     )
                 }
-            }
 
-            item { 
-                NewMembersSection(
-                    members = viewModel.usuarios,
-                    onAddClick = onNavigateToFamily
-                )
-            }
+                item { 
+                    val totalGastado = viewModel.tickets.sumOf { it.total }
+                    AccumulatedSavingsCard(totalGastado) 
+                }
 
-            item { 
-                val totalGastado = viewModel.tickets.sumOf { it.total }
-                AccumulatedSavingsCard(totalGastado) 
-            }
+                item { AITipCard() }
 
-            item { AITipCard() }
-
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        text = "ÚLTIMAS COMPRAS",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            letterSpacing = 2.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                    )
-                    if (tickets.isEmpty()) {
-                        Text("No hay compras registradas", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                    } else {
-                        tickets.forEach { ticket ->
-                            val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-                            PurchaseRow(
-                                ticket.supermercado, 
-                                sdf.format(Date(ticket.fechaHora)), 
-                                formatPrice(ticket.total)
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            text = "ÚLTIMAS COMPRAS",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                letterSpacing = 2.sp,
+                                fontWeight = FontWeight.Black
                             )
+                        )
+                        if (tickets.isEmpty()) {
+                            Text("No hay compras registradas", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        } else {
+                            tickets.forEach { ticket ->
+                                val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                                PurchaseRow(
+                                    ticket.supermercado, 
+                                    sdf.format(Date(ticket.fechaHora)), 
+                                    formatPrice(ticket.total)
+                                )
+                            }
                         }
                     }
                 }
@@ -126,17 +142,24 @@ fun formatPrice(amount: Int): String {
 }
 
 @Composable
-fun Header(onNotificationsClick: () -> Unit) {
+fun Header(onNotificationsClick: () -> Unit, isCritical: Boolean = false) {
+    val headerColor = if (isCritical) {
+        Brush.horizontalGradient(listOf(Amber500.copy(alpha = 0.2f), Rose500.copy(alpha = 0.2f)))
+    } else {
+        Brush.linearGradient(listOf(MaterialTheme.colorScheme.background.copy(alpha = 0.9f), MaterialTheme.colorScheme.background.copy(alpha = 0.9f)))
+    }
+    
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, if (isCritical) Rose500.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline)
     ) {
         Row(
             modifier = Modifier
                 .statusBarsPadding()
                 .height(88.dp)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 24.dp)
+                .background(headerColor),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -254,6 +277,7 @@ fun SelectorItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
 @Composable
 fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditBudget: (Int) -> Unit) {
     var showEditDialog by remember { mutableStateOf(false) }
+    var showDetailsDialog by remember { mutableStateOf(false) }
     
     val totalMonto = if (presupuesto.montoTotal <= 0) 1 else presupuesto.montoTotal
     
@@ -264,6 +288,11 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
     val ratioEsen = (esenTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
     val ratioPrin = (prinTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
     val ratioSec = (secTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
+    
+    val gastado = presupuesto.montoTotal - presupuesto.montoDisponible
+    val porcentajeGastado = if (presupuesto.montoTotal > 0) {
+        (gastado.toFloat() / presupuesto.montoTotal) * 100
+    } else 0f
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -307,7 +336,7 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { showEditDialog = true }
+                modifier = Modifier.clickable { showDetailsDialog = true }
             ) {
                 Text(
                     "DISPONIBLE",
@@ -333,6 +362,48 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
+                )
+            }
+            
+            // Details Dialog
+            if (showDetailsDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDetailsDialog = false },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    title = { Text("Detalles del Presupuesto", color = MaterialTheme.colorScheme.onSurface) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Total:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(formatPrice(presupuesto.montoTotal), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Gastado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(formatPrice(gastado), fontWeight = FontWeight.Bold, color = Emerald500)
+                            }
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Disponible:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(formatPrice(presupuesto.montoDisponible), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Porcentaje gastado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${String.format("%.1f", porcentajeGastado)}%", fontWeight = FontWeight.Bold, color = if (porcentajeGastado > 90) Rose500 else Emerald500)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { 
+                            showDetailsDialog = false
+                            showEditDialog = true
+                        }) {
+                            Text("EDITAR", color = MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDetailsDialog = false }) {
+                            Text("CERRAR", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 )
             }
         }
@@ -421,7 +492,7 @@ fun AccumulatedSavingsCard(total: Int) {
                     .align(Alignment.TopEnd)
                     .background(
                         Brush.radialGradient(
-                            listOf(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f), Color.Transparent)
+                            listOf(Emerald500.copy(alpha = 0.15f), Color.Transparent)
                         )
                     )
             )
@@ -433,13 +504,13 @@ fun AccumulatedSavingsCard(total: Int) {
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(24.dp)),
+                        .background(Emerald600, RoundedCornerShape(24.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.TrendingUp,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiary,
+                        tint = White,
                         modifier = Modifier.size(30.dp)
                     )
                 }

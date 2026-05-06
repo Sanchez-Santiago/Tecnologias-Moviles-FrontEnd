@@ -24,10 +24,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.misuper.data.model.Producto
+import com.example.misuper.ui.components.ListaSkeleton
 import com.example.misuper.ui.screens.inicio.ModeSelector
 import com.example.misuper.ui.theme.*
 import com.example.misuper.viewmodel.AppViewModel
 import java.util.Locale
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun ListaScreen(viewModel: AppViewModel) {
@@ -64,15 +68,60 @@ fun ListaScreen(viewModel: AppViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val context = LocalContext.current
+        
+        fun compartirLista() {
+            val lista = viewModel.listas.find { it.id == listaActualId }
+            if (lista != null) {
+                val texto = buildString {
+                    appendLine("🛒 Mi Lista de Compras: ${lista.nombre}")
+                    appendLine("─".repeat(30))
+                    lista.productos.forEach { producto ->
+                        val check = if (producto.comprado) "✅" else "⬜"
+                        appendLine("$check ${producto.nombre} x${producto.cantidad} - $${producto.precioEstimado}")
+                    }
+                    appendLine("─".repeat(30))
+                    appendLine("Total estimado: $${lista.productos.sumOf { it.precioEstimado * it.cantidad }}")
+                }
+                
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, texto)
+                    putExtra(Intent.EXTRA_SUBJECT, "Lista de Compras - MiSuper")
+                }
+                context.startActivity(Intent.createChooser(intent, "Compartir lista"))
+            }
+        }
+        
+        if (viewModel.isLoading) {
+            ListaSkeleton()
+        } else {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
-                    Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-                        ModeSelector(
-                            activeId = presupuestoActivo?.id ?: "",
-                            onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            ModeSelector(
+                                activeId = presupuestoActivo?.id ?: "",
+                                onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
+                            )
+                        }
+                        IconButton(
+                            onClick = { compartirLista() },
+                            modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = "Compartir lista",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
@@ -125,7 +174,8 @@ fun ListaScreen(viewModel: AppViewModel) {
                 }
             }
         }
-
+        }
+        
         if (showAddItemModal) {
             NewProductScreen(viewModel = viewModel, onClose = { showAddItemModal = false })
         }

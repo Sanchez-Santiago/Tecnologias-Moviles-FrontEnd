@@ -36,9 +36,37 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
     var price by remember { mutableStateOf(itemToEdit?.precioEstimado?.toString() ?: "") }
     var selectedCategory by remember { mutableStateOf(itemToEdit?.categoria ?: Categoria.ESENCIAL) }
     var quantity by remember { mutableIntStateOf(itemToEdit?.cantidad ?: 1) }
+    
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var priceError by remember { mutableStateOf<String?>(null) }
 
     val isEditing = itemToEdit != null
-    val isValid = name.isNotBlank() && price.isNotBlank()
+    
+    fun validateForm(): Boolean {
+        var isValid = true
+        
+        if (name.isBlank()) {
+            nameError = "El nombre es obligatorio"
+            isValid = false
+        } else {
+            nameError = null
+        }
+        
+        val priceValue = price.filter { it.isDigit() }.toIntOrNull()
+        if (price.isBlank()) {
+            priceError = "El precio es obligatorio"
+            isValid = false
+        } else if (priceValue == null || priceValue == 0) {
+            priceError = "El precio no puede ser 0"
+            isValid = false
+        } else {
+            priceError = null
+        }
+        
+        return isValid
+    }
+    
+    val isValid = name.isNotBlank() && price.isNotBlank() && price.filter { it.isDigit() }.toIntOrNull() ?: 0 > 0
 
     Box(
         modifier = Modifier
@@ -99,7 +127,10 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                 FormField(label = "Nombre del Producto *") {
                     CustomTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = { 
+                            name = it
+                            if (it.isNotBlank()) nameError = null
+                        },
                         placeholder = "Ej: Leche deslactosada",
                         leadingIcon = Icons.Default.Inventory
                     )
@@ -117,7 +148,10 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                     FormField(label = "Precio Est. *", modifier = Modifier.weight(1f)) {
                         CustomTextField(
                             value = price,
-                            onValueChange = { price = it },
+                            onValueChange = { 
+                                price = it
+                                if (it.isNotBlank()) priceError = null
+                            },
                             placeholder = "0.00",
                             leadingIcon = Icons.Default.LocalOffer,
                             height = 48.dp,
@@ -150,7 +184,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
 
             Button(
                 onClick = { 
-                    if (isValid) {
+                    if (validateForm()) {
                         val cleanPrice = price.filter { it.isDigit() }.toIntOrNull() ?: 0
                         
                         val newProduct = Producto(
@@ -164,7 +198,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                             categoria = selectedCategory
                         )
                         
-                        // Determinar en qué lista guardarlo basándonos en el presupuesto activo
+                        // Determinar en qué lista guardarlo basándose en el presupuesto activo
                         val presupuestoActivo = viewModel.presupuestos.find { it.activo }
                         val listaId = if (presupuestoActivo?.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
                         
@@ -225,30 +259,49 @@ fun CustomTextField(
     placeholder: String,
     leadingIcon: ImageVector? = null,
     height: Dp = 56.dp,
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    error: String? = null
 ) {
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
-        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) },
-        leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) } },
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = MaterialTheme.colorScheme.primary,
-            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-        ),
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(height)
+                .clip(RoundedCornerShape(16.dp))
+                .border(
+                    1.dp, 
+                    if (error != null) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) 
+                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), 
+                    RoundedCornerShape(16.dp)
+                ),
+            placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) },
+            leadingIcon = if (leadingIcon != null) {
+                { Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else null,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            ),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
+        )
+        
+        if (error != null) {
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 16.dp)
+            )
+        }
+    }
 }
 
 @Composable

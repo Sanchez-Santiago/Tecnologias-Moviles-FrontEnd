@@ -24,10 +24,16 @@ val Slate100 = Color(0xFFF1F5F9) // Product Names
 val Slate50 = Color(0xFFF8FAFC)  // Primary Text / Titles
 
 // Emerald - Primary and Success
+val Emerald700 = Color(0xFF047857) // Higher contrast for text on light backgrounds
 val Emerald600 = Color(0xFF059669) // Buttons and Links / Active Essential
 val Emerald500 = Color(0xFF10B981) // Main Actions / Savings
 val Emerald400 = Color(0xFF34D399) // Savings detail / Plus
 val EmeraldGlow = Color(0x3310B981) // Success Glow (20% opacity)
+
+// Function to get accessible color based on background
+fun getAccessibleEmerald(onLightBackground: Boolean): Color {
+    return if (onLightBackground) Emerald700 else Emerald500
+}
 
 // Blue / Indigo - Accent and Categories
 val Blue600 = Color(0xFF2563EB)   // Accumulated Savings Background / Active Secondary
