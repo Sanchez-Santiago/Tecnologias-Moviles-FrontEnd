@@ -29,7 +29,7 @@ fun FamilyMembersScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = Slate950,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Row(
                 modifier = Modifier
@@ -39,12 +39,12 @@ fun FamilyMembersScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = White)
+                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
                 }
                 Text(
                     "MIEMBROS DE LA FAMILIA",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        color = White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 2.sp
                     )
@@ -54,11 +54,16 @@ fun FamilyMembersScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
-                containerColor = Emerald600,
-                contentColor = White,
-                shape = CircleShape
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape,
+                modifier = Modifier
+                    .padding(bottom = 16.dp, end = 8.dp)
+                    .size(56.dp)
+                    .border(4.dp, MaterialTheme.colorScheme.background, CircleShape),
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(28.dp))
             }
         }
     ) { padding ->
@@ -70,7 +75,7 @@ fun FamilyMembersScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         ) {
             Text(
                 "Administra quiénes pueden ver y editar las listas de compras y el presupuesto familiar.",
-                style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
+                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
@@ -107,9 +112,9 @@ fun FamilyMembersScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 fun MemberCard(usuario: Usuario) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Slate900,
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(24.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Slate800)
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -132,22 +137,22 @@ fun MemberCard(usuario: Usuario) {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(usuario.nombre, color = White, fontWeight = FontWeight.Bold)
-                Text(usuario.email, color = Slate500, fontSize = 12.sp)
+                Text(usuario.nombre, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                Text(usuario.email, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
             Surface(
-                color = if (usuario.rol == RolUsuario.ADMIN) Emerald500.copy(alpha = 0.1f) else Slate800,
+                color = if (usuario.rol == RolUsuario.ADMIN) Emerald500.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(8.dp),
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
-                    if (usuario.rol == RolUsuario.ADMIN) Emerald500.copy(alpha = 0.5f) else Slate700
+                    if (usuario.rol == RolUsuario.ADMIN) Emerald500.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline
                 )
             ) {
                 Text(
                     usuario.rol.name,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = if (usuario.rol == RolUsuario.ADMIN) Emerald500 else Slate400,
+                        color = if (usuario.rol == RolUsuario.ADMIN) Emerald500 else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 8.sp
                     )
                 )
@@ -163,8 +168,8 @@ fun AddMemberDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) 
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Slate900,
-        title = { Text("Invitar Miembro", color = White) },
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text("Invitar Miembro", color = MaterialTheme.colorScheme.onSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 TextField(
@@ -172,10 +177,10 @@ fun AddMemberDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) 
                     onValueChange = { name = it },
                     placeholder = { Text("Nombre") },
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Slate800,
-                        unfocusedContainerColor = Slate800,
-                        focusedTextColor = White,
-                        unfocusedTextColor = White
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
                 TextField(
@@ -183,22 +188,22 @@ fun AddMemberDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) 
                     onValueChange = { email = it },
                     placeholder = { Text("Email") },
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Slate800,
-                        unfocusedContainerColor = Slate800,
-                        focusedTextColor = White,
-                        unfocusedTextColor = White
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             }
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name, email) }) {
-                Text("INVITAR", color = Emerald500)
+                Text("INVITAR", color = MaterialTheme.colorScheme.primary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCELAR", color = Slate400)
+                Text("CANCELAR", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

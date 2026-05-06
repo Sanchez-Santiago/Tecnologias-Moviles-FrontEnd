@@ -1,6 +1,5 @@
 package com.example.misuper.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -10,6 +9,20 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+
+// ----------------------
+// ENUM DEL MODO DE TEMA
+// ----------------------
+
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK
+}
+
+// ----------------------
+// DARK THEME
+// ----------------------
 
 private val DarkColorScheme = darkColorScheme(
     primary = Emerald500,
@@ -29,6 +42,10 @@ private val DarkColorScheme = darkColorScheme(
     onError = White
 )
 
+// ----------------------
+// LIGHT THEME
+// ----------------------
+
 private val LightColorScheme = lightColorScheme(
     primary = Emerald600,
     secondary = Blue600,
@@ -40,25 +57,36 @@ private val LightColorScheme = lightColorScheme(
     onTertiary = White,
     onBackground = Slate950,
     onSurface = Slate950,
-    outline = Slate400,
-    surfaceVariant = White,
-    onSurfaceVariant = Slate800,
+    outline = Slate200,
+    surfaceVariant = Slate100,
+    onSurfaceVariant = Slate600,
     error = Rose600,
     onError = White
 )
 
+// ----------------------
+// THEME PRINCIPAL
+// ----------------------
+
 @Composable
 fun MiSuperTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    // Setting default to false to prioritize the custom Emerald/Slate palette
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+
+    // 🔥 Convertimos ThemeMode → Boolean (dark o light)
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+    }
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (darkTheme) dynamicDarkColorScheme(context)
+            else dynamicLightColorScheme(context)
         }
 
         darkTheme -> DarkColorScheme

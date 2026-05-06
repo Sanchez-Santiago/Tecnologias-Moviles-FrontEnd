@@ -37,8 +37,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MiSuperTheme {
-                MainScreen()
+            val viewModel: AppViewModel = viewModel()
+            MiSuperTheme(themeMode = viewModel.themeMode) {
+                MainScreen(viewModel)
             }
         }
     }
@@ -46,11 +47,8 @@ class MainActivity : ComponentActivity() {
 
 
 @Composable
-fun MainScreen() {
+fun MainScreen(viewModel: AppViewModel) {
     val navController = rememberNavController()
-
-    // 🔥 ACÁ se crea UNA sola vez
-    val viewModel: AppViewModel = viewModel()
 
     Scaffold(
         bottomBar = {
@@ -72,7 +70,7 @@ fun MainScreen() {
             composable("LISTA") { ListaScreen(viewModel) }
             composable("TICKETS") { TicketsScreen(viewModel) }
             composable("OFERTAS") { OfertasScreen(viewModel) }
-            composable("PERFIL") { ProfileScreen(viewModel) }
+            composable("PERFIL") { ProfileScreen(viewModel, navController) }
 
             // Sub-pantallas
             composable("NOTIFICACIONES") { NotificationsScreen(viewModel) }
@@ -88,8 +86,8 @@ fun BottomBar(navController: NavController) {
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Slate900.copy(alpha = 0.9f),
-        border = BorderStroke(1.dp, Slate800)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         NavigationBar(
             containerColor = Color.Transparent,
@@ -119,7 +117,7 @@ fun BottomBar(navController: NavController) {
                             imageVector = icon,
                             contentDescription = null,
                             modifier = Modifier.size(22.dp),
-                            tint = if (selected) White else Slate400
+                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     label = {
@@ -128,7 +126,7 @@ fun BottomBar(navController: NavController) {
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Black,
-                                color = if (selected) White else Slate400
+                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                     },

@@ -36,7 +36,7 @@ fun NewMembersSection(
             Text(
                 text = "MIEMBROS DE LA FAMILIA",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = Slate400,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 2.sp,
                     fontWeight = FontWeight.Black
                 )
@@ -45,7 +45,7 @@ fun NewMembersSection(
                 text = "GESTIONAR",
                 modifier = Modifier.clickable { onAddClick() },
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = Emerald500,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
             )
@@ -76,14 +76,14 @@ fun MemberAvatar(member: Usuario) {
             modifier = Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(Slate900)
-                .border(2.dp, Emerald500.copy(alpha = 0.2f), CircleShape),
+                .background(MaterialTheme.colorScheme.surface)
+                .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = member.nombre.take(1).uppercase(),
                 style = MaterialTheme.typography.titleMedium.copy(
-                    color = White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             )
@@ -91,7 +91,7 @@ fun MemberAvatar(member: Usuario) {
         Text(
             text = member.nombre.split(" ").first(),
             style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate400,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.sp
             )
         )
@@ -108,22 +108,22 @@ fun AddMemberCircle(onClick: () -> Unit) {
             modifier = Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(Slate900)
-                .border(2.dp, Slate800, CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = "Agregar miembro",
-                tint = Slate400,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         }
         Text(
             text = "Agregar",
             style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate500,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.sp
             )
         )

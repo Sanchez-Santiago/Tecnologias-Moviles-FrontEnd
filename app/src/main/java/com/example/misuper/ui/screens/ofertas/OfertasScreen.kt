@@ -37,20 +37,20 @@ fun OfertasScreen(viewModel: AppViewModel) {
     )
 
     Scaffold(
-        containerColor = Slate950,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Column(modifier = Modifier.padding(24.dp).statusBarsPadding()) {
                 Text(
                     "OFERTAS PERSONALIZADAS",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        color = White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 2.sp
                     )
                 )
                 Text(
                     "Basado en tus productos frecuentes",
-                    style = MaterialTheme.typography.bodySmall.copy(color = Slate500)
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
             }
         }
@@ -100,9 +100,9 @@ fun OfertasScreen(viewModel: AppViewModel) {
 fun OfertaCard(oferta: Oferta) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Slate900,
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(24.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Slate800)
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -111,7 +111,7 @@ fun OfertaCard(oferta: Oferta) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .background(Slate800, RoundedCornerShape(16.dp)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.ShoppingBag, contentDescription = null, tint = Emerald500)
@@ -120,12 +120,12 @@ fun OfertaCard(oferta: Oferta) {
             Spacer(modifier = Modifier.width(16.dp))
             
             Column(modifier = Modifier.weight(1f)) {
-                Text(oferta.supermercado, color = Slate400, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text(oferta.producto, color = White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(oferta.supermercado, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(oferta.producto, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "$${oferta.precioAnterior.toInt()}",
-                        color = Slate500,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp,
                         style = MaterialTheme.typography.bodySmall.copy(
                             textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough

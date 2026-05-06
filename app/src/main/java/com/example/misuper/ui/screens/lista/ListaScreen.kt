@@ -43,17 +43,29 @@ fun ListaScreen(viewModel: AppViewModel) {
     val listaActual = viewModel.listas.find { it.id == listaActualId }
     val items = listaActual?.productos ?: emptyList<Producto>()
 
-    val filteredItems = items.filter { item ->
-        val matchesFilter = if (selectedFilter == "TODOS") true else item.categoria.name == selectedFilter
-        val matchesQuery = item.nombre.contains(searchQuery, ignoreCase = true) ||
-                item.categoria.name.contains(searchQuery, ignoreCase = true) ||
-                item.precioEstimado.toString().contains(searchQuery)
-        matchesFilter && matchesQuery
+    val filteredItems by remember(items, selectedFilter, searchQuery) {
+        derivedStateOf {
+            items.filter { item ->
+                val matchesFilter = if (selectedFilter == "TODOS") true else item.categoria.name == selectedFilter
+                val matchesQuery = item.nombre.contains(searchQuery, ignoreCase = true) ||
+                        item.categoria.name.contains(searchQuery, ignoreCase = true) ||
+                        item.precioEstimado.toString().contains(searchQuery)
+                matchesFilter && matchesQuery
+            }
+        }
+    }
+
+    val totals by remember(items) {
+        derivedStateOf {
+            val totalEst = items.sumOf { it.precioEstimado * it.cantidad }
+            val totalReal = items.filter { it.comprado }.sumOf { (it.precioReal ?: it.precioEstimado) * it.cantidad }
+            Pair(totalEst, totalReal)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            containerColor = Slate950,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
                     Box(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -68,9 +80,7 @@ fun ListaScreen(viewModel: AppViewModel) {
             },
             floatingActionButton = { FabAddItem(onClick = { showAddItemModal = true }) },
             bottomBar = { 
-                val totalEst = items.sumOf { it.precioEstimado * it.cantidad }
-                val totalReal = items.filter { it.comprado }.sumOf { (it.precioReal ?: it.precioEstimado) * it.cantidad }
-                ShoppingSummary(totalEst, totalReal) 
+                ShoppingSummary(totals.first, totals.second) 
             }
         ) { padding ->
             Column(
@@ -100,14 +110,16 @@ fun ListaScreen(viewModel: AppViewModel) {
                         contentPadding = PaddingValues(bottom = 100.dp)
                     ) {
                         items(filteredItems, key = { it.id }) { item ->
-                            ItemCard(
-                                item = item,
-                                onCheckedChange = { _ ->
-                                    viewModel.toggleProducto(listaActualId, item.id)
-                                },
-                                onEdit = { editingItem = item },
-                                onDelete = { viewModel.eliminarProducto(listaActualId, item.id) }
-                            )
+                            Box(modifier = Modifier.animateItem()) {
+                                ItemCard(
+                                    item = item,
+                                    onCheckedChange = { _ ->
+                                        viewModel.toggleProducto(listaActualId, item.id)
+                                    },
+                                    onEdit = { editingItem = item },
+                                    onDelete = { viewModel.eliminarProducto(listaActualId, item.id) }
+                                )
+                            }
                         }
                     }
                 }
@@ -138,24 +150,24 @@ fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, Slate800, RoundedCornerShape(16.dp)),
-            placeholder = { Text("Buscar producto o precio...", color = Slate500, fontSize = 14.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Slate500) },
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
+            placeholder = { Text("Buscar producto o precio...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = Slate500)
+                        Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             },
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = Slate900,
-                unfocusedContainerColor = Slate900,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Emerald500,
-                focusedTextColor = White,
-                unfocusedTextColor = White
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             singleLine = true
         )
@@ -195,9 +207,9 @@ fun FilterButton(
             "ESENCIAL" -> Emerald600
             "PRINCIPAL" -> Blue600
             "SECUNDARIO" -> Amber600
-            else -> Slate700
+            else -> MaterialTheme.colorScheme.primary
         }
-    } else Slate900
+    } else MaterialTheme.colorScheme.surface
 
     val scale by animateFloatAsState(if (isSelected) 1.02f else 1f)
 
@@ -207,7 +219,7 @@ fun FilterButton(
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
         color = backgroundColor,
-        border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, Slate800) else null,
+        border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
         shadowElevation = if (isSelected) 8.dp else 0.dp
     ) {
         Row(
@@ -221,13 +233,13 @@ fun FilterButton(
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.5.sp,
-                    color = if (isSelected) White else Slate500
+                    color = if (isSelected) White else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
             
             Box(
                 modifier = Modifier
-                    .background(White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                    .background(if (isSelected) White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
@@ -235,7 +247,7 @@ fun FilterButton(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isSelected) White else Slate500
+                        color = if (isSelected) White else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
             }
@@ -249,7 +261,7 @@ fun ItemCard(item: Producto, onCheckedChange: (Boolean) -> Unit, onEdit: () -> U
         "ESENCIAL" -> Emerald500
         "PRINCIPAL" -> Blue500
         "SECUNDARIO" -> Amber500
-        else -> Slate400
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     val borderColor by animateColorAsState(
@@ -262,7 +274,7 @@ fun ItemCard(item: Producto, onCheckedChange: (Boolean) -> Unit, onEdit: () -> U
             .border(2.dp, borderColor, RoundedCornerShape(24.dp))
             .clip(RoundedCornerShape(24.dp))
             .clickable { onCheckedChange(!item.comprado) },
-        colors = CardDefaults.cardColors(containerColor = Slate900.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -273,7 +285,7 @@ fun ItemCard(item: Producto, onCheckedChange: (Boolean) -> Unit, onEdit: () -> U
                         Text(
                             text = item.nombre,
                             style = MaterialTheme.typography.bodyLarge.copy(
-                                color = if (item.comprado) Slate100.copy(alpha = 0.4f) else Slate100,
+                                color = if (item.comprado) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold,
                                 textDecoration = if (item.comprado) TextDecoration.LineThrough else null
                             )
@@ -281,17 +293,17 @@ fun ItemCard(item: Producto, onCheckedChange: (Boolean) -> Unit, onEdit: () -> U
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "x${item.cantidad}",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Slate500)
+                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                         )
                     }
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onEdit, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Edit, "Editar", tint = Slate500, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Edit, "Editar", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     }
                     IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Delete, "Eliminar", tint = Rose500.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Delete, "Eliminar", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -304,12 +316,13 @@ fun ItemCard(item: Producto, onCheckedChange: (Boolean) -> Unit, onEdit: () -> U
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Est: ${formatPrice(item.precioEstimado)}",
-                    style = MaterialTheme.typography.bodySmall.copy(color = Slate500, fontSize = 12.sp)
+                    text = "Unit: ${formatPrice(item.precioEstimado)}",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 )
                 
+                val displayPrice = (item.precioReal ?: item.precioEstimado) * item.cantidad
                 Text(
-                    text = formatPrice(item.precioReal ?: item.precioEstimado),
+                    text = formatPrice(displayPrice),
                     style = MaterialTheme.typography.titleMedium.copy(
                         color = Emerald500,
                         fontWeight = FontWeight.Bold,
@@ -324,7 +337,7 @@ fun ItemCard(item: Producto, onCheckedChange: (Boolean) -> Unit, onEdit: () -> U
 @Composable
 fun CustomCheckbox(isChecked: Boolean) {
     val backgroundColor by animateColorAsState(if (isChecked) Emerald500 else Color.Transparent)
-    val borderColor by animateColorAsState(if (isChecked) Emerald500 else Slate500)
+    val borderColor by animateColorAsState(if (isChecked) Emerald500 else MaterialTheme.colorScheme.onSurfaceVariant)
     
     Box(
         modifier = Modifier
@@ -343,7 +356,7 @@ fun CustomCheckbox(isChecked: Boolean) {
 fun ShoppingSummary(totalEst: Int, totalReal: Int) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Slate900.copy(alpha = 0.8f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
         tonalElevation = 0.dp
     ) {
         Column {
@@ -351,7 +364,7 @@ fun ShoppingSummary(totalEst: Int, totalReal: Int) {
                 progress = { if (totalEst > 0) totalReal.toFloat() / totalEst else 0f },
                 modifier = Modifier.fillMaxWidth().height(4.dp),
                 color = Emerald500,
-                trackColor = Slate800,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
 
             Row(
@@ -362,8 +375,8 @@ fun ShoppingSummary(totalEst: Int, totalReal: Int) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Total estimado", style = MaterialTheme.typography.labelSmall.copy(color = Slate500))
-                    Text(formatPrice(totalEst), style = MaterialTheme.typography.titleMedium.copy(color = White))
+                    Text("Total estimado", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Text(formatPrice(totalEst), style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface))
                 }
 
                 Text(
@@ -382,13 +395,13 @@ fun ShoppingSummary(totalEst: Int, totalReal: Int) {
 fun FabAddItem(onClick: () -> Unit) {
     FloatingActionButton(
         onClick = onClick,
-        containerColor = Emerald600,
-        contentColor = White,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
         shape = CircleShape,
         modifier = Modifier
             .padding(bottom = 16.dp, end = 8.dp)
             .size(56.dp)
-            .border(4.dp, Slate950, CircleShape),
+            .border(4.dp, MaterialTheme.colorScheme.background, CircleShape),
         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
     ) {
         Icon(Icons.Default.Add, contentDescription = "Agregar", modifier = Modifier.size(28.dp))
@@ -406,13 +419,13 @@ fun EmptyState() {
             Icons.Default.ShoppingBag,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint = Slate800
+            tint = MaterialTheme.colorScheme.outline
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "TU LISTA ESTÁ VACÍA",
             style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate800,
+                color = MaterialTheme.colorScheme.outline,
                 letterSpacing = 2.sp,
                 fontWeight = FontWeight.Black
             )

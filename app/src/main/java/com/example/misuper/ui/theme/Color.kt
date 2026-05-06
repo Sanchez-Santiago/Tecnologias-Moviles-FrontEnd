@@ -18,6 +18,8 @@ val Slate700 = Color(0xFF334155) // Active Filter Background
 val Slate600 = Color(0xFF475569) // Placeholders
 val Slate500 = Color(0xFF64748B) // Inactive Filter Text
 val Slate400 = Color(0xFF94A3B8) // Secondary Text
+val Slate300 = Color(0xFFCBD5E1) // Borders Light
+val Slate200 = Color(0xFFE2E8F0) // Separators Light
 val Slate100 = Color(0xFFF1F5F9) // Product Names
 val Slate50 = Color(0xFFF8FAFC)  // Primary Text / Titles
 

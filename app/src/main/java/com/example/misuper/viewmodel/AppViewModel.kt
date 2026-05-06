@@ -3,9 +3,12 @@ package com.example.misuper.viewmodel
 import android.app.Application
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.misuper.data.local.JsonStorage
 import com.example.misuper.data.model.*
 import com.example.misuper.data.repository.AppRepository
+import com.example.misuper.ui.theme.ThemeMode
+import kotlinx.coroutines.launch
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -25,24 +28,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var usuarios = mutableStateListOf<Usuario>()
         private set
 
+    var themeMode by mutableStateOf(ThemeMode.SYSTEM)
+        private set
+
     init {
         cargarDatos()
     }
 
     private fun cargarDatos() {
-        repository.cargarTodo()
+        viewModelScope.launch {
+            repository.cargarTodo()
 
-        presupuestos.clear()
-        presupuestos.addAll(repository.presupuestos)
+            presupuestos.clear()
+            presupuestos.addAll(repository.presupuestos)
 
-        listas.clear()
-        listas.addAll(repository.listas)
+            listas.clear()
+            listas.addAll(repository.listas)
 
-        tickets.clear()
-        tickets.addAll(repository.tickets)
+            tickets.clear()
+            tickets.addAll(repository.tickets)
 
-        usuarios.clear()
-        usuarios.addAll(repository.usuarios)
+            usuarios.clear()
+            usuarios.addAll(repository.usuarios)
+
+            themeMode = repository.themeMode
+        }
     }
 
     // ----------------------
@@ -50,18 +60,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ----------------------
 
     fun agregarProducto(listaId: String, producto: Producto) {
-        repository.agregarOActualizarProducto(listaId, producto)
-        refrescar()
+        viewModelScope.launch {
+            repository.agregarOActualizarProducto(listaId, producto)
+            refrescar()
+        }
     }
 
     fun eliminarProducto(listaId: String, productoId: String) {
-        repository.eliminarProducto(listaId, productoId)
-        refrescar()
+        viewModelScope.launch {
+            repository.eliminarProducto(listaId, productoId)
+            refrescar()
+        }
     }
 
     fun toggleProducto(listaId: String, productoId: String) {
-        repository.toggleProducto(listaId, productoId)
-        refrescar()
+        viewModelScope.launch {
+            repository.toggleProducto(listaId, productoId)
+            refrescar()
+        }
     }
 
     // ----------------------
@@ -69,13 +85,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ----------------------
 
     fun actualizarPresupuesto(id: String, monto: Int) {
-        repository.actualizarPresupuesto(id, monto)
-        refrescar()
+        viewModelScope.launch {
+            repository.actualizarPresupuesto(id, monto)
+            refrescar()
+        }
     }
 
     fun cambiarPresupuestoActivo(id: String) {
-        repository.cambiarPresupuestoActivo(id)
-        refrescar()
+        viewModelScope.launch {
+            repository.cambiarPresupuestoActivo(id)
+            refrescar()
+        }
     }
 
     // ----------------------
@@ -83,18 +103,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ----------------------
 
     fun agregarTicket(ticket: Ticket) {
-        repository.agregarTicket(ticket)
-        refrescar()
+        viewModelScope.launch {
+            repository.agregarTicket(ticket)
+            refrescar()
+        }
     }
 
     fun eliminarTicket(id: String) {
-        repository.eliminarTicket(id)
-        refrescar()
+        viewModelScope.launch {
+            repository.eliminarTicket(id)
+            refrescar()
+        }
     }
 
     fun actualizarTicket(ticket: Ticket) {
-        repository.actualizarTicket(ticket)
-        refrescar()
+        viewModelScope.launch {
+            repository.actualizarTicket(ticket)
+            refrescar()
+        }
     }
 
     // ----------------------
@@ -102,8 +128,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ----------------------
 
     fun agregarUsuario(usuario: Usuario) {
-        repository.agregarUsuario(usuario)
-        refrescar()
+        viewModelScope.launch {
+            repository.agregarUsuario(usuario)
+            refrescar()
+        }
+    }
+
+    // ----------------------
+    // THEME
+    // ----------------------
+
+    fun updateThemeMode(mode: ThemeMode) {
+        themeMode = mode
+        viewModelScope.launch {
+            repository.updateThemeMode(mode)
+        }
     }
 
     // ----------------------

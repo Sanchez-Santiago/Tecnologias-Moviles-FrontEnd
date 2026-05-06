@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,17 +26,27 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.example.misuper.data.model.RolUsuario
 import com.example.misuper.data.model.Usuario
 import com.example.misuper.ui.theme.*
 import com.example.misuper.viewmodel.AppViewModel
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
-fun ProfileScreen(viewModel: AppViewModel) {
+fun ProfileScreen(viewModel: AppViewModel, navController: NavController? = null) {
     var visible by remember { mutableStateOf(false) }
     var showEditProfile by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     
+    val isDark = when (viewModel.themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+    }
+
     LaunchedEffect(Unit) { visible = true }
 
     val members = viewModel.usuarios
@@ -44,7 +55,7 @@ fun ProfileScreen(viewModel: AppViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Slate950)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Background Orbs
         Box(
@@ -58,7 +69,8 @@ fun ProfileScreen(viewModel: AppViewModel) {
 
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = { ProfileHeader() }
+            topBar = { ProfileHeader(isDark) },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
             LazyColumn(
                 modifier = Modifier
@@ -73,7 +85,18 @@ fun ProfileScreen(viewModel: AppViewModel) {
                     ProfileInfoCard(
                         name = "Santiago",
                         email = "santiago@misuper.com",
+                        isDark = isDark,
                         onEdit = { showEditProfile = true }
+                    )
+                }
+
+                // Theme Selector
+                item {
+                    SectionHeader("TEMA DE LA APLICACIÓN")
+                    ThemeSelector(
+                        currentMode = viewModel.themeMode,
+                        isDark = isDark,
+                        onModeChange = { viewModel.updateThemeMode(it) }
                     )
                 }
 
@@ -89,6 +112,7 @@ fun ProfileScreen(viewModel: AppViewModel) {
                                 title = p.nombre,
                                 total = p.montoTotal,
                                 available = p.montoDisponible,
+                                isDark = isDark,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -100,7 +124,7 @@ fun ProfileScreen(viewModel: AppViewModel) {
                     SectionHeader("MIEMBROS DE LA FAMILIA (${members.size})")
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         members.forEach { member ->
-                            MemberRow(member)
+                            MemberRow(member, isDark)
                         }
                     }
                 }
@@ -112,13 +136,46 @@ fun ProfileScreen(viewModel: AppViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(Slate900)
-                            .border(1.dp, Slate800, RoundedCornerShape(24.dp))
+                            .background(if (isDark) Slate900 else Slate50)
+                            .border(1.dp, if (isDark) Slate800 else Slate200, RoundedCornerShape(24.dp))
                     ) {
-                        SettingsItem(Icons.Default.Notifications, "Notificaciones", "Configura tus alertas")
-                        SettingsItem(Icons.Default.Security, "Privacidad", "Maneja tus datos")
-                        SettingsItem(Icons.Default.Help, "Ayuda y Soporte", "Centro de asistencia")
-                        SettingsItem(Icons.Default.Logout, "Cerrar Sesión", "Salir de la cuenta", isDestructive = true)
+                        SettingsItem(
+                            Icons.Default.Notifications, 
+                            "Notificaciones", 
+                            "Configura tus alertas",
+                            isDark = isDark,
+                            onClick = { navController?.navigate("NOTIFICACIONES") }
+                        )
+                        SettingsItem(
+                            Icons.Default.Security, 
+                            "Privacidad", 
+                            "Maneja tus datos",
+                            isDark = isDark,
+                            onClick = { 
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Próximamente")
+                                }
+                            }
+                        )
+                        SettingsItem(
+                            Icons.Default.Help, 
+                            "Ayuda y Soporte", 
+                            "Centro de asistencia",
+                            isDark = isDark,
+                            onClick = { 
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Próximamente")
+                                }
+                            }
+                        )
+                        SettingsItem(
+                            Icons.Default.Logout, 
+                            "Cerrar Sesión", 
+                            "Salir de la cuenta", 
+                            isDestructive = true,
+                            isDark = isDark,
+                            onClick = { }
+                        )
                     }
                 }
             }
@@ -130,13 +187,79 @@ fun ProfileScreen(viewModel: AppViewModel) {
     }
 }
 
+@Composable
+fun ThemeSelector(currentMode: ThemeMode, isDark: Boolean, onModeChange: (ThemeMode) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(if (isDark) Slate900 else Slate50)
+            .border(1.dp, if (isDark) Slate800 else Slate200, RoundedCornerShape(24.dp))
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ThemeOption(
+            icon = Icons.Default.SettingsBrightness,
+            label = "Sistema",
+            isSelected = currentMode == ThemeMode.SYSTEM,
+            modifier = Modifier.weight(1f),
+            onClick = { onModeChange(ThemeMode.SYSTEM) }
+        )
+        ThemeOption(
+            icon = Icons.Default.LightMode,
+            label = "Claro",
+            isSelected = currentMode == ThemeMode.LIGHT,
+            modifier = Modifier.weight(1f),
+            onClick = { onModeChange(ThemeMode.LIGHT) }
+        )
+        ThemeOption(
+            icon = Icons.Default.DarkMode,
+            label = "Oscuro",
+            isSelected = currentMode == ThemeMode.DARK,
+            modifier = Modifier.weight(1f),
+            onClick = { onModeChange(ThemeMode.DARK) }
+        )
+    }
+}
+
+@Composable
+fun ThemeOption(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val contentColor = if (isSelected) White else Slate500
+    val containerColor = if (isSelected) Emerald600 else Color.Transparent
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(containerColor)
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, null, tint = contentColor, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            label,
+            color = contentColor,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
+    }
+}
+
 fun formatPrice(amount: Int): String {
     val formatter = java.text.DecimalFormat("$#,###.###", java.text.DecimalFormatSymbols(Locale("es", "AR")))
     return formatter.format(amount).replace(",", ".")
 }
 
 @Composable
-fun ProfileHeader() {
+fun ProfileHeader(isDark: Boolean) {
     Row(
         modifier = Modifier
             .statusBarsPadding()
@@ -147,7 +270,7 @@ fun ProfileHeader() {
         Text(
             "MI PERFIL",
             style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate100,
+                color = if (isDark) Slate100 else Slate900,
                 fontWeight = FontWeight.Black,
                 fontSize = 12.sp,
                 letterSpacing = 2.4.sp
@@ -157,12 +280,12 @@ fun ProfileHeader() {
 }
 
 @Composable
-fun ProfileInfoCard(name: String, email: String, onEdit: () -> Unit) {
+fun ProfileInfoCard(name: String, email: String, isDark: Boolean, onEdit: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = Slate900),
-        border = BorderStroke(1.dp, Slate800)
+        colors = CardDefaults.cardColors(containerColor = if (isDark) Slate900 else Slate50),
+        border = BorderStroke(1.dp, if (isDark) Slate800 else Slate200)
     ) {
         Row(
             modifier = Modifier.padding(24.dp),
@@ -172,7 +295,7 @@ fun ProfileInfoCard(name: String, email: String, onEdit: () -> Unit) {
                 modifier = Modifier
                     .size(80.dp)
                     .background(Emerald600, CircleShape)
-                    .border(4.dp, Slate950, CircleShape),
+                    .border(4.dp, if (isDark) Slate950 else White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -186,7 +309,7 @@ fun ProfileInfoCard(name: String, email: String, onEdit: () -> Unit) {
             Spacer(modifier = Modifier.width(20.dp))
             
             Column(modifier = Modifier.weight(1f)) {
-                Text(name, color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(name, color = if (isDark) White else Slate950, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text(email, color = Slate500, fontSize = 14.sp)
             }
             
@@ -212,17 +335,17 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun BudgetStatCard(title: String, total: Int, available: Int, modifier: Modifier = Modifier) {
+fun BudgetStatCard(title: String, total: Int, available: Int, isDark: Boolean, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Slate900),
-        border = BorderStroke(1.dp, Slate800)
+        colors = CardDefaults.cardColors(containerColor = if (isDark) Slate900 else Slate50),
+        border = BorderStroke(1.dp, if (isDark) Slate800 else Slate200)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title.uppercase(), color = Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(formatPrice(total), color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(formatPrice(total), color = if (isDark) White else Slate950, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Text("Disponible", color = Emerald500, fontSize = 11.sp)
             Text(formatPrice(available), color = Emerald500, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
@@ -230,26 +353,27 @@ fun BudgetStatCard(title: String, total: Int, available: Int, modifier: Modifier
 }
 
 @Composable
-fun MemberRow(member: Usuario) {
+fun MemberRow(member: Usuario, isDark: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Slate900)
+            .background(if (isDark) Slate900 else Slate50)
+            .border(1.dp, if (isDark) Slate800 else Slate200, RoundedCornerShape(20.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(Slate800, CircleShape),
+                .background(if (isDark) Slate800 else Slate200, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(member.nombre.take(1).uppercase(), color = White, fontWeight = FontWeight.Bold)
+            Text(member.nombre.take(1).uppercase(), color = if (isDark) White else Slate950, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(member.nombre, color = White, fontWeight = FontWeight.Bold)
+            Text(member.nombre, color = if (isDark) White else Slate950, fontWeight = FontWeight.Bold)
             Text(member.rol.name, color = Slate500, fontSize = 12.sp)
         }
         if (member.rol == RolUsuario.ADMIN) {
@@ -259,22 +383,29 @@ fun MemberRow(member: Usuario) {
 }
 
 @Composable
-fun SettingsItem(icon: ImageVector, title: String, subtitle: String, isDestructive: Boolean = false) {
+fun SettingsItem(
+    icon: ImageVector, 
+    title: String, 
+    subtitle: String, 
+    isDark: Boolean,
+    isDestructive: Boolean = false,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable { onClick() }
             .padding(20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, null, tint = if (isDestructive) Rose500 else Slate400, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(20.dp))
         Column {
-            Text(title, color = if (isDestructive) Rose500 else White, fontWeight = FontWeight.Bold)
+            Text(title, color = if (isDestructive) Rose500 else if (isDark) White else Slate950, fontWeight = FontWeight.Bold)
             Text(subtitle, color = Slate500, fontSize = 12.sp)
         }
         Spacer(modifier = Modifier.weight(1f))
-        Icon(Icons.Default.ChevronRight, null, tint = Slate700)
+        Icon(Icons.Default.ChevronRight, null, tint = if (isDark) Slate700 else Slate300)
     }
 }
 

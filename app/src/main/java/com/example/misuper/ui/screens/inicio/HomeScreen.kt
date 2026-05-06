@@ -44,7 +44,7 @@ fun HomeScreen(
 
     Scaffold(
         topBar = { Header(onNavigateToNotifications) },
-        containerColor = Slate950
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -97,13 +97,13 @@ fun HomeScreen(
                     Text(
                         text = "ÚLTIMAS COMPRAS",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = Slate400,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             letterSpacing = 2.sp,
                             fontWeight = FontWeight.Black
                         )
                     )
                     if (tickets.isEmpty()) {
-                        Text("No hay compras registradas", color = Slate500, fontSize = 12.sp)
+                        Text("No hay compras registradas", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     } else {
                         tickets.forEach { ticket ->
                             val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
@@ -129,8 +129,8 @@ fun formatPrice(amount: Int): String {
 fun Header(onNotificationsClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Slate950.copy(alpha = 0.9f),
-        border = BorderStroke(1.dp, Slate900)
+        color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Row(
             modifier = Modifier
@@ -144,7 +144,7 @@ fun Header(onNotificationsClick: () -> Unit) {
                 Text(
                     text = "SUPER AHORRO",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        color = Slate50,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp
                     )
@@ -152,7 +152,7 @@ fun Header(onNotificationsClick: () -> Unit) {
                 Text(
                     text = "Hola, Santiago",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = Emerald500,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
@@ -165,22 +165,22 @@ fun Header(onNotificationsClick: () -> Unit) {
                         onClick = onNotificationsClick,
                         modifier = Modifier
                             .size(40.dp)
-                            .background(Slate900, CircleShape)
-                            .border(1.dp, Slate800, CircleShape)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                     ) {
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = null,
-                            tint = Slate400,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(Emerald500, CircleShape)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
                             .align(Alignment.TopEnd)
-                            .border(2.dp, Slate950, CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
                     )
                 }
 
@@ -189,12 +189,12 @@ fun Header(onNotificationsClick: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .border(2.dp, Emerald500.copy(alpha = 0.2f), CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), CircleShape)
                         .clip(CircleShape)
-                        .background(Slate900),
+                        .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = Slate400)
+                    Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -207,8 +207,8 @@ fun ModeSelector(activeId: String, onModeChange: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .background(Slate900, RoundedCornerShape(32.dp))
-            .border(1.dp, Slate800, RoundedCornerShape(32.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(32.dp))
             .padding(6.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
@@ -235,14 +235,14 @@ fun SelectorItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(28.dp))
-            .background(if (isSelected) Emerald500 else Color.Transparent)
+            .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall.copy(
-                color = if (isSelected) Slate950 else Slate400,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Black,
                 fontSize = 11.sp,
                 letterSpacing = 2.sp
@@ -274,9 +274,10 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
             modifier = Modifier.size(160.dp),
             contentAlignment = Alignment.Center
         ) {
+            val colorScheme = MaterialTheme.colorScheme
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawArc(
-                    color = Slate800,
+                    color = colorScheme.outline,
                     startAngle = 0f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -320,7 +321,7 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
                 Text(
                     formatPrice(presupuesto.montoDisponible),
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        color = White,
+                        color = colorScheme.onBackground,
                         fontWeight = FontWeight.Black,
                         fontSize = 28.sp
                     )
@@ -328,7 +329,7 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
                 Text(
                     "TOTAL: ${formatPrice(presupuesto.montoTotal)}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = Slate400,
+                        color = colorScheme.onSurfaceVariant,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -350,18 +351,18 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
         var newAmount by remember { mutableStateOf(presupuesto.montoTotal.toString()) }
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            containerColor = Slate900,
-            title = { Text("Editar Presupuesto", color = White) },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Editar Presupuesto", color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 TextField(
                     value = newAmount,
                     onValueChange = { newAmount = it },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Slate800,
-                        unfocusedContainerColor = Slate800,
-                        focusedTextColor = White,
-                        unfocusedTextColor = White
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             },
@@ -371,7 +372,7 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
                     onEditBudget(cleaned)
                     showEditDialog = false 
                 }) {
-                    Text("GUARDAR", color = Emerald500)
+                    Text("GUARDAR", color = MaterialTheme.colorScheme.primary)
                 }
             }
         )
@@ -387,7 +388,7 @@ fun LegendItem(color: Color, label: String, value: String) {
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = Slate400,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -396,7 +397,7 @@ fun LegendItem(color: Color, label: String, value: String) {
         Text(
             value,
             style = MaterialTheme.typography.titleMedium.copy(
-                color = Slate50,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -409,8 +410,8 @@ fun AccumulatedSavingsCard(total: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(40.dp),
-        colors = CardDefaults.cardColors(containerColor = Slate900),
-        border = BorderStroke(1.dp, Slate800)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             // Simulated gradient glow in top right
@@ -420,7 +421,7 @@ fun AccumulatedSavingsCard(total: Int) {
                     .align(Alignment.TopEnd)
                     .background(
                         Brush.radialGradient(
-                            listOf(Indigo600.copy(alpha = 0.15f), Color.Transparent)
+                            listOf(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f), Color.Transparent)
                         )
                     )
             )
@@ -432,13 +433,13 @@ fun AccumulatedSavingsCard(total: Int) {
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .background(Indigo600, RoundedCornerShape(24.dp)),
+                        .background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(24.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.TrendingUp,
                         contentDescription = null,
-                        tint = White,
+                        tint = MaterialTheme.colorScheme.onTertiary,
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -448,12 +449,12 @@ fun AccumulatedSavingsCard(total: Int) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "Gasto Total",
-                        style = MaterialTheme.typography.labelSmall.copy(color = Slate400, fontSize = 10.sp)
+                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                     )
                     Text(
                         formatPrice(total),
                         style = MaterialTheme.typography.headlineLarge.copy(
-                            color = White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             fontSize = 30.sp
                         )
@@ -523,14 +524,15 @@ fun PurchaseRow(supermarket: String, date: String, amount: String) {
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
-            .background(Slate900.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(Slate950, RoundedCornerShape(12.dp)),
+                .background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Default.Store, contentDescription = null, tint = Emerald500)
@@ -542,21 +544,21 @@ fun PurchaseRow(supermarket: String, date: String, amount: String) {
             Text(
                 supermarket,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = Slate50,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
             )
             Text(
                 date,
-                style = MaterialTheme.typography.labelSmall.copy(color = Slate400, fontSize = 10.sp)
+                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
             )
         }
 
         Text(
             amount,
             style = MaterialTheme.typography.titleMedium.copy(
-                color = Slate400,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )

@@ -39,13 +39,13 @@ fun NotificationsScreen(viewModel: AppViewModel) {
     )
 
     Scaffold(
-        containerColor = Slate950,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Column(modifier = Modifier.padding(24.dp).statusBarsPadding()) {
                 Text(
                     "NOTIFICACIONES",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        color = White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 2.sp
                     )
@@ -98,9 +98,9 @@ fun NotificationsScreen(viewModel: AppViewModel) {
 fun NotificationItem(notification: AppNotification) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Slate900,
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Slate800)
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -129,9 +129,9 @@ fun NotificationItem(notification: AppNotification) {
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(notification.title, color = White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(notification.message, color = Slate400, fontSize = 12.sp)
-                Text(notification.time, color = Slate600, fontSize = 10.sp)
+                Text(notification.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(notification.message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text(notification.time, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 10.sp)
             }
         }
     }

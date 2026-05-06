@@ -2,6 +2,9 @@ package com.example.misuper.data.repository
 
 import com.example.misuper.data.local.JsonStorage
 import com.example.misuper.data.model.*
+import com.example.misuper.ui.theme.ThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class AppRepository(private val storage: JsonStorage) {
 
@@ -17,11 +20,14 @@ class AppRepository(private val storage: JsonStorage) {
     var usuarios = mutableListOf<Usuario>()
         private set
 
+    var themeMode: ThemeMode = ThemeMode.SYSTEM
+        private set
+
     // ----------------------
     // CARGA INICIAL
     // ----------------------
 
-    fun cargarTodo() {
+    suspend fun cargarTodo() = withContext(Dispatchers.IO) {
         val data = storage.cargar()
 
         if (data != null) {
@@ -29,12 +35,13 @@ class AppRepository(private val storage: JsonStorage) {
             listas = data.listas.toMutableList()
             tickets = data.tickets.toMutableList()
             usuarios = data.usuarios.toMutableList()
+            themeMode = data.themeMode
         } else {
             inicializarDatos()
         }
     }
 
-    private fun inicializarDatos() {
+    private suspend fun inicializarDatos() {
         val familiarId = "presupuesto-familiar"
         val individualId = "presupuesto-individual"
 
@@ -92,12 +99,13 @@ class AppRepository(private val storage: JsonStorage) {
     // GUARDADO
     // ----------------------
 
-    fun guardarTodo() {
+    suspend fun guardarTodo() = withContext(Dispatchers.IO) {
         val data = AppData(
             presupuestos = presupuestos.toList(),
             listas = listas.toList(),
             tickets = tickets.toList(),
-            usuarios = usuarios.toList()
+            usuarios = usuarios.toList(),
+            themeMode = themeMode
         )
 
         storage.guardar(data)
@@ -107,7 +115,7 @@ class AppRepository(private val storage: JsonStorage) {
     // PRESUPUESTO
     // ----------------------
 
-    fun cambiarPresupuestoActivo(id: String) {
+    suspend fun cambiarPresupuestoActivo(id: String) {
         val nuevas = presupuestos.map {
             it.copy(activo = it.id == id)
         }
@@ -126,7 +134,7 @@ class AppRepository(private val storage: JsonStorage) {
         }
     }
 
-    fun actualizarPresupuesto(id: String, nuevoMonto: Int) {
+    suspend fun actualizarPresupuesto(id: String, nuevoMonto: Int) {
         val index = presupuestos.indexOfFirst { it.id == id }
         if (index != -1) {
             val actual = presupuestos[index]
@@ -143,12 +151,12 @@ class AppRepository(private val storage: JsonStorage) {
     // LISTAS
     // ----------------------
 
-    fun agregarLista(lista: ListaCompra) {
+    suspend fun agregarLista(lista: ListaCompra) {
         listas.add(lista)
         guardarTodo()
     }
 
-    fun agregarOActualizarProducto(listaId: String, producto: Producto) {
+    suspend fun agregarOActualizarProducto(listaId: String, producto: Producto) {
         val indexLista = listas.indexOfFirst { it.id == listaId }
         if (indexLista != -1) {
             val lista = listas[indexLista]
@@ -166,7 +174,7 @@ class AppRepository(private val storage: JsonStorage) {
         }
     }
 
-    fun eliminarProducto(listaId: String, productoId: String) {
+    suspend fun eliminarProducto(listaId: String, productoId: String) {
         val indexLista = listas.indexOfFirst { it.id == listaId }
         if (indexLista != -1) {
             val lista = listas[indexLista]
@@ -178,7 +186,7 @@ class AppRepository(private val storage: JsonStorage) {
         }
     }
 
-    fun toggleProducto(listaId: String, productoId: String) {
+    suspend fun toggleProducto(listaId: String, productoId: String) {
         val indexLista = listas.indexOfFirst { it.id == listaId }
         if (indexLista == -1) return
         
@@ -208,7 +216,7 @@ class AppRepository(private val storage: JsonStorage) {
     // TICKETS
     // ----------------------
 
-    fun agregarTicket(ticket: Ticket) {
+    suspend fun agregarTicket(ticket: Ticket) {
         val presupuestoActivo = presupuestos.find { it.activo }
         val ticketVinculado = if (presupuestoActivo != null) {
             ticket.copy(presupuestoId = presupuestoActivo.id)
@@ -223,7 +231,7 @@ class AppRepository(private val storage: JsonStorage) {
         guardarTodo()
     }
 
-    fun eliminarTicket(id: String) {
+    suspend fun eliminarTicket(id: String) {
         val ticket = tickets.find { it.id == id } ?: return
         
         // Devolver dinero al presupuesto al que estaba vinculado
@@ -233,7 +241,7 @@ class AppRepository(private val storage: JsonStorage) {
         guardarTodo()
     }
 
-    fun actualizarTicket(ticket: Ticket) {
+    suspend fun actualizarTicket(ticket: Ticket) {
         val index = tickets.indexOfFirst { it.id == ticket.id }
         if (index != -1) {
             val anterior = tickets[index]
@@ -251,8 +259,17 @@ class AppRepository(private val storage: JsonStorage) {
     // USUARIOS
     // ----------------------
 
-    fun agregarUsuario(usuario: Usuario) {
+    suspend fun agregarUsuario(usuario: Usuario) {
         usuarios.add(usuario)
+        guardarTodo()
+    }
+
+    // ----------------------
+    // THEME
+    // ----------------------
+
+    suspend fun updateThemeMode(mode: ThemeMode) {
+        themeMode = mode
         guardarTodo()
     }
 }

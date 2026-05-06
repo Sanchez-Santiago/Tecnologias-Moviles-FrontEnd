@@ -55,7 +55,7 @@ fun TicketsScreen(viewModel: AppViewModel) {
         ticket.productos.any { it.nombre.contains(searchQuery, ignoreCase = true) }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Slate950)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
@@ -85,7 +85,7 @@ fun TicketsScreen(viewModel: AppViewModel) {
                 if (filteredTickets.isEmpty()) {
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                            Text("No hay tickets en este modo", color = Slate500, fontSize = 14.sp)
+                            Text("No hay tickets en este modo", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                         }
                     }
                 }
@@ -125,13 +125,13 @@ fun formatPrice(amount: Int): String {
 fun FabAddTicket(onClick: () -> Unit) {
     FloatingActionButton(
         onClick = onClick,
-        containerColor = Emerald600,
-        contentColor = White,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
         shape = CircleShape,
         modifier = Modifier
             .padding(bottom = 16.dp, end = 8.dp)
             .size(56.dp)
-            .border(4.dp, Slate950, CircleShape),
+            .border(4.dp, MaterialTheme.colorScheme.background, CircleShape),
         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
     ) {
         Icon(Icons.Default.Add, contentDescription = "Agregar Ticket", modifier = Modifier.size(28.dp))
@@ -147,24 +147,24 @@ fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, Slate800, RoundedCornerShape(16.dp)),
-            placeholder = { Text("Buscar por súper, fecha o producto...", color = Slate500, fontSize = 14.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Slate500) },
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
+            placeholder = { Text("Buscar por súper, fecha o producto...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = Slate500)
+                        Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             },
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = Slate900,
-                unfocusedContainerColor = Slate900,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Emerald500,
-                focusedTextColor = White,
-                unfocusedTextColor = White
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             singleLine = true
         )
@@ -183,7 +183,7 @@ fun TicketsHeader() {
         Text(
             text = "HISTORIAL DE COMPRAS",
             style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate100,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Black,
                 fontSize = 12.sp,
                 letterSpacing = 2.4.sp
@@ -205,8 +205,8 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
             .clip(RoundedCornerShape(32.dp))
             .clickable { expanded = !expanded },
         shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = Slate900),
-        border = BorderStroke(1.dp, Slate800)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -218,13 +218,13 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                     modifier = Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Slate800),
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Receipt,
                         contentDescription = null,
-                        tint = Slate600.copy(alpha = 0.6f),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -233,7 +233,7 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                     Text(
                         ticket.supermercado,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            color = White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         )
@@ -243,22 +243,22 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.CalendarToday, null, tint = Slate500, modifier = Modifier.size(10.dp))
+                            Icon(Icons.Default.CalendarToday, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(10.dp))
                             Text(
                                 sdfDate.format(Date(ticket.fechaHora)),
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Slate500,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Black,
                                     fontSize = 9.sp
                                 )
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.AccessTime, null, tint = Slate500, modifier = Modifier.size(10.dp))
+                            Icon(Icons.Default.AccessTime, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(10.dp))
                             Text(
                                 sdfTime.format(Date(ticket.fechaHora)),
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Slate500,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Black,
                                     fontSize = 9.sp
                                 )
@@ -286,7 +286,7 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 20.dp),
                         thickness = 1.dp,
-                        color = Slate800
+                        color = MaterialTheme.colorScheme.outline
                     )
                     
                     Row(
@@ -297,7 +297,7 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                         Text(
                             "DESGLOSE DE PRODUCTOS",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = Slate500,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -314,9 +314,9 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Edit, null, tint = Blue500, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("EDITAR", color = Blue500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text("EDITAR", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             TextButton(
@@ -324,9 +324,9 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Delete, null, tint = Rose500, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("ELIMINAR", color = Rose500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text("ELIMINAR", color = MaterialTheme.colorScheme.error, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -346,22 +346,22 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
     if (showAttachment) {
         AlertDialog(
             onDismissRequest = { showAttachment = false },
-            containerColor = Slate900,
+            containerColor = MaterialTheme.colorScheme.surface,
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Comprobante adjunto", color = White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
+                    Text("Comprobante adjunto", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(300.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Slate800),
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             if (ticket.imagenPath.contains(".pdf")) Icons.Default.PictureAsPdf else Icons.Default.Image,
                             contentDescription = null,
-                            tint = Slate500,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(64.dp)
                         )
                     }
@@ -369,7 +369,7 @@ fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
             },
             confirmButton = {
                 TextButton(onClick = { showAttachment = false }) {
-                    Text("CERRAR", color = Emerald500)
+                    Text("CERRAR", color = MaterialTheme.colorScheme.primary)
                 }
             }
         )
@@ -382,18 +382,18 @@ fun ProductItemRow(product: TicketProducto) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Slate950.copy(alpha = 0.4f))
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.4f))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column {
-            Text(product.nombre, color = White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text("x${product.cantidad}", color = Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(product.nombre, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text("x${product.cantidad}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
         Text(
             formatPrice(product.precio),
-            color = White,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
         )
@@ -451,7 +451,7 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 48.dp, topEnd = 48.dp))
-                .background(Slate900)
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(enabled = false) { }
                 .padding(32.dp)
         ) {
@@ -464,21 +464,21 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                     Text(
                         if (ticketToEdit == null) "Registrar Compra" else "Editar Compra",
                         style = MaterialTheme.typography.headlineSmall.copy(
-                            color = White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
                     )
                     Text(
                         "Ingresa los detalles del ticket...",
-                        style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp)
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                     )
                 }
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier.size(24.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Slate500)
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -497,19 +497,19 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                         .fillMaxWidth()
                         .height(56.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, Slate700.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                         .clickable { datePicker.show() },
-                    color = Slate800
+                    color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(Icons.Default.CalendarToday, null, tint = Slate500, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.CalendarToday, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         Text(
                             SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(dateMillis)),
-                            color = Slate100
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -536,8 +536,8 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             .clip(RoundedCornerShape(16.dp))
                             .clickable { cameraLauncher.launch(null) },
                         shape = RoundedCornerShape(16.dp),
-                        color = if (capturedBitmap != null) Emerald600.copy(alpha = 0.1f) else Slate800,
-                        border = BorderStroke(1.dp, if (capturedBitmap != null) Emerald500 else Slate700.copy(alpha = 0.5f))
+                        color = if (capturedBitmap != null) Emerald600.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, if (capturedBitmap != null) Emerald500 else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             if (capturedBitmap != null) {
@@ -547,7 +547,7 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                                     Text("CAPTURADO", color = Emerald500, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                             } else {
-                                Icon(Icons.Default.PhotoCamera, null, tint = Slate400, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Default.PhotoCamera, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
                             }
                         }
                     }
@@ -562,8 +562,8 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             .clip(RoundedCornerShape(16.dp))
                             .clickable { galleryLauncher.launch("*/*") }, 
                         shape = RoundedCornerShape(16.dp),
-                        color = if (selectedUri != null) Blue600.copy(alpha = 0.1f) else Slate800,
-                        border = BorderStroke(1.dp, if (selectedUri != null) Blue500 else Slate700.copy(alpha = 0.5f))
+                        color = if (selectedUri != null) Blue600.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, if (selectedUri != null) Blue500 else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             if (selectedUri != null) {
@@ -573,7 +573,7 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                                     Text("ADJUNTO", color = Blue500, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                             } else {
-                                Icon(Icons.Default.FileUpload, null, tint = Slate400, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Default.FileUpload, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
                             }
                         }
                     }
@@ -586,8 +586,8 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             .fillMaxWidth()
                             .height(100.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Slate800)
-                            .border(1.dp, Slate700, RoundedCornerShape(16.dp)),
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (capturedBitmap != null) {
@@ -600,7 +600,7 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Description, null, tint = Blue500)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Archivo seleccionado", color = White)
+                                Text("Archivo seleccionado", color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }
@@ -643,8 +643,8 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                     .fillMaxWidth()
                     .height(64.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Emerald600,
-                    disabledContainerColor = Slate800
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
                 shape = RoundedCornerShape(16.dp),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
@@ -652,7 +652,7 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                 Text(
                     "GUARDAR COMPRA",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = if (isValid) White else Slate500,
+                        color = if (isValid) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Black,
                         fontSize = 14.sp,
                         letterSpacing = 2.8.sp
@@ -681,24 +681,24 @@ fun ModalTextField(
             .fillMaxWidth()
             .height(if (isLarge) 64.dp else 56.dp)
             .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, Slate700.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
         placeholder = { 
             Text(
                 placeholder, 
-                color = Slate500, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
                 fontSize = if (isLarge) 18.sp else 16.sp,
                 fontWeight = if (isLarge) FontWeight.Bold else FontWeight.Normal
             ) 
         },
-        leadingIcon = { Icon(leadingIcon, null, tint = Slate500, modifier = Modifier.size(18.dp)) },
+        leadingIcon = { Icon(leadingIcon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Slate800,
-            unfocusedContainerColor = Slate800,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = Emerald500,
-            focusedTextColor = if (isLarge) White else Slate100,
-            unfocusedTextColor = if (isLarge) White else Slate100
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
         ),
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyLarge.copy(

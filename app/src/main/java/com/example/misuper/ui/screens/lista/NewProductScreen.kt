@@ -43,7 +43,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Slate950.copy(alpha = 0.8f))
+            .background(Color.Black.copy(alpha = 0.8f))
             .clickable(enabled = false) { }
     ) {
         Column(
@@ -52,8 +52,8 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                 .fillMaxWidth()
                 .fillMaxHeight(0.9f)
                 .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
-                .background(Slate900)
-                .border(1.dp, Slate800, RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                 .padding(32.dp)
         ) {
             // Header
@@ -66,7 +66,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                     Text(
                         text = if (isEditing) "Editar Producto" else "Añadir Producto",
                         style = MaterialTheme.typography.headlineMedium.copy(
-                            color = White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             fontSize = 24.sp
                         )
@@ -74,7 +74,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                     Text(
                         text = if (isEditing) "Actualiza los detalles de tu producto." else "Personaliza tu próximo artículo de compra.",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = Slate400,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp
                         )
                     )
@@ -83,7 +83,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                     onClick = onClose,
                     modifier = Modifier.size(24.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Slate500)
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -178,8 +178,8 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                     .fillMaxWidth()
                     .height(64.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Emerald600,
-                    disabledContainerColor = Slate800
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
                 shape = RoundedCornerShape(16.dp),
                 contentPadding = PaddingValues(0.dp)
@@ -193,7 +193,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.5.sp,
-                            color = if (isValid) White else Slate500
+                            color = if (isValid) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -210,7 +210,7 @@ fun FormField(label: String, modifier: Modifier = Modifier, content: @Composable
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Black,
-                color = Slate500,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.5.sp
             )
         )
@@ -234,17 +234,17 @@ fun CustomTextField(
             .fillMaxWidth()
             .height(height)
             .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, Slate700, RoundedCornerShape(16.dp)),
-        placeholder = { Text(placeholder, color = Slate600, fontSize = 16.sp) },
-        leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp), tint = Slate600) } },
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) },
+        leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) } },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Slate800,
-            unfocusedContainerColor = Slate800,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = Emerald500,
-            focusedTextColor = White,
-            unfocusedTextColor = White
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
         ),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
@@ -258,13 +258,13 @@ fun CategoryButton(text: String, isSelected: Boolean, color: Color, modifier: Mo
             .height(48.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
-        color = if (isSelected) color else Slate800,
-        border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, Slate700) else null
+        color = if (isSelected) color else MaterialTheme.colorScheme.surfaceVariant,
+        border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = text,
-                style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isSelected) White else Slate400)
+                style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isSelected) White else MaterialTheme.colorScheme.onSurfaceVariant)
             )
         }
     }
@@ -277,13 +277,13 @@ fun QuantityCounter(count: Int, onIncrement: () -> Unit, onDecrement: () -> Unit
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Slate800)
-            .border(1.dp, Slate700, RoundedCornerShape(16.dp)),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        IconButton(onClick = onDecrement) { Icon(Icons.Default.Remove, null, tint = White) }
-        Text(count.toString(), color = White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        IconButton(onClick = onIncrement) { Icon(Icons.Default.Add, null, tint = White) }
+        IconButton(onClick = onDecrement) { Icon(Icons.Default.Remove, null, tint = MaterialTheme.colorScheme.onSurface) }
+        Text(count.toString(), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        IconButton(onClick = onIncrement) { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurface) }
     }
 }
