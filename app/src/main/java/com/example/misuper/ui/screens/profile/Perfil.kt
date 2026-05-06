@@ -147,6 +147,27 @@ fun ProfileScreen(viewModel: AppViewModel, navController: NavController? = null)
                             onClick = { navController?.navigate("NOTIFICACIONES") }
                         )
                         SettingsItem(
+                            Icons.Default.History, 
+                            "Historial de Compras", 
+                            "Ver todas tus compras",
+                            isDark = isDark,
+                            onClick = { navController?.navigate("HISTORIAL") }
+                        )
+                        SettingsItem(
+                            Icons.Default.BarChart, 
+                            "Estadísticas", 
+                            "Visualiza tus gastos",
+                            isDark = isDark,
+                            onClick = { navController?.navigate("ESTADISTICAS") }
+                        )
+                        SettingsItem(
+                            Icons.Default.Settings, 
+                            "Configuración", 
+                            "Ajustes de la aplicación",
+                            isDark = isDark,
+                            onClick = { navController?.navigate("SETTINGS") }
+                        )
+                        SettingsItem(
                             Icons.Default.Security, 
                             "Privacidad", 
                             "Maneja tus datos",

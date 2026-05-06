@@ -1,3 +1,29 @@
 <resources>
-    <string name="app_name">MiSuper</string>
+    <string name="app_name">Super Ahorro</string>
+    <string name="splash_title">SUPER AHORRO</string>
+    <string name="splash_subtitle">Tu aliado en el supermercado</string>
+    <string name="login_title">Iniciar Sesión</string>
+    <string name="register_title">Crear Cuenta</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Contraseña</string>
+    <string name="confirm_password_hint">Confirmar contraseña</string>
+    <string name="name_hint">Nombre completo</string>
+    <string name="login_button">Iniciar Sesión</string>
+    <string name="register_button">Registrarse</string>
+    <string name="no_account">¿No tienes cuenta? Regístrate</string>
+    <string name="have_account">¿Ya tienes cuenta? Inicia sesión</string>
+    <string name="home_title">Inicio</string>
+    <string name="lista_title">Lista</string>
+    <string name="tickets_title">Tickets</string>
+    <string name="ofertas_title">Ofertas</string>
+    <string name="perfil_title">Perfil</string>
+    <string name="historial_title">Historial de Compras</string>
+    <string name="estadisticas_title">Estadísticas</string>
+    <string name="nueva_compra_title">Nueva Compra</string>
+    <string name="detalle_compra_title">Detalle de Compra</string>
+    <string name="settings_title">Configuración</string>
+    <string name="fecha_hint">Fecha</string>
+    <string name="hora_hint">Hora</string>
+    <string name="supermercado_hint">Supermercado</string>
+    <string name="total_hint">Total</string>
 </resources>

@@ -2,13 +2,16 @@ package com.example.misuper.data.model
 
 data class Producto(
     val id: String,
+    val codigo: String = "",
     val nombre: String,
-    val marca: String,
-    val precioEstimado: Int,
-    val precioReal: Int?,
-    val cantidad: Int,
-    val comprado: Boolean,
-    val categoria: Categoria
+    val descripcion: String = "",
+    val precio: Int = 0,
+    val marca: String = "",
+    val precioEstimado: Int = 0,
+    val precioReal: Int? = null,
+    val cantidad: Int = 1,
+    val comprado: Boolean = false,
+    val categoria: Categoria = Categoria.ESENCIAL
 )
 
 enum class Categoria {

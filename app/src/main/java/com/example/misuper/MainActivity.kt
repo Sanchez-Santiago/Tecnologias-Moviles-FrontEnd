@@ -20,12 +20,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.*
+import com.example.misuper.ui.screens.auth.LoginScreen
+import com.example.misuper.ui.screens.auth.RegisterScreen
+import com.example.misuper.ui.screens.compra.DetalleCompraScreen
+import com.example.misuper.ui.screens.compra.NuevaCompraScreen
+import com.example.misuper.ui.screens.estadisticas.EstadisticasScreen
 import com.example.misuper.ui.screens.familia.FamilyMembersScreen
+import com.example.misuper.ui.screens.historial.HistorialScreen
 import com.example.misuper.ui.screens.inicio.HomeScreen
 import com.example.misuper.ui.screens.lista.ListaScreen
 import com.example.misuper.ui.screens.notifications.NotificationsScreen
 import com.example.misuper.ui.screens.ofertas.OfertasScreen
 import com.example.misuper.ui.screens.profile.ProfileScreen
+import com.example.misuper.ui.screens.settings.SettingsScreen
+import com.example.misuper.ui.screens.splash.SplashScreen
 import com.example.misuper.ui.screens.tickets.TicketsScreen
 import com.example.misuper.ui.theme.*
 
@@ -49,28 +57,45 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(viewModel: AppViewModel) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    val showBottomBar = currentRoute in listOf("INICIO", "LISTA", "TICKETS", "OFERTAS", "PERFIL")
 
     Scaffold(
         bottomBar = {
-            BottomBar(navController)
+            if (showBottomBar) {
+                BottomBar(navController)
+            }
         }
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = "INICIO",
+            startDestination = "SPLASH",
             modifier = Modifier.padding(padding)
         ) {
-            composable("INICIO") { 
+            composable("SPLASH") { SplashScreen(navController) }
+            composable("LOGIN") { LoginScreen(navController) }
+            composable("REGISTER") { RegisterScreen(navController) }
+            composable("INICIO") {
                 HomeScreen(
                     viewModel = viewModel,
                     onNavigateToNotifications = { navController.navigate("NOTIFICACIONES") },
                     onNavigateToFamily = { navController.navigate("FAMILIA") }
-                ) 
+                )
             }
             composable("LISTA") { ListaScreen(viewModel) }
+            composable("NUEVA_COMPRA") { NuevaCompraScreen(navController) }
+            composable("DETALLE_COMPRA/{compraId}") { backStackEntry ->
+                val compraId = backStackEntry.arguments?.getString("compraId") ?: ""
+                DetalleCompraScreen(navController, compraId)
+            }
+            composable("HISTORIAL") { HistorialScreen(navController) }
+            composable("ESTADISTICAS") { EstadisticasScreen(navController) }
             composable("TICKETS") { TicketsScreen(viewModel) }
             composable("OFERTAS") { OfertasScreen(viewModel) }
             composable("PERFIL") { ProfileScreen(viewModel, navController) }
+            composable("SETTINGS") { SettingsScreen(navController, viewModel) }
 
             // Sub-pantallas
             composable("NOTIFICACIONES") { NotificationsScreen(viewModel) }
@@ -94,11 +119,11 @@ fun BottomBar(navController: NavController) {
             tonalElevation = 0.dp
         ) {
             val items = listOf(
-                Triple("INICIO", Icons.Filled.Home, "INICIO"),
-                Triple("LISTA", Icons.Filled.ShoppingCart, "LISTA"),
-                Triple("TICKETS", Icons.Filled.RequestPage, "TICKETS"),
-                Triple("OFERTAS", Icons.Filled.LocalOffer, "OFERTAS"),
-                Triple("PERFIL", Icons.Filled.Person, "PERFIL")
+                Triple("INICIO", Icons.Filled.Home, "Inicio"),
+                Triple("LISTA", Icons.Filled.ShoppingCart, "Lista"),
+                Triple("TICKETS", Icons.Filled.RequestPage, "Tickets"),
+                Triple("OFERTAS", Icons.Filled.LocalOffer, "Ofertas"),
+                Triple("PERFIL", Icons.Filled.Person, "Perfil")
             )
 
             items.forEach { (route, icon, label) ->
