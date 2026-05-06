@@ -19,6 +19,7 @@ Desarrollar una aplicación funcional en Android que gestione compras de superme
 - ✅ Historial de compras ordenado por fecha
 - ✅ Edición y eliminación de registros
 - ✅ Lista de compras con productos
+- ✅ Corrección de crash al crear productos ✅
 
 ### Análisis y Visualización
 - ✅ Estadísticas y gráficos de gastos (por período, por supermercado, evolución mensual)
@@ -35,6 +36,7 @@ Desarrollar una aplicación funcional en Android que gestione compras de superme
 - ✅ Validación de formularios con mensajes de error
 - ✅ Selector de tema (Claro/Oscuro/Sistema)
 - ✅ Notificaciones y ofertas con diseño premium
+- ✅ SplashScreen mejorado con gradiente Emerald ✅
 
 ## 🛠️ Tecnologías Utilizadas
 - **Lenguaje:** Kotlin
@@ -46,9 +48,9 @@ Desarrollar una aplicación funcional en Android que gestione compras de superme
 - **Persistencia:** JSON local / DataStore (pendiente)
 - **Intents:** Compartir por WhatsApp, Cámara, Galería
 
-## 📈 Estado Actual del Proyecto - Primera Entrega
+## 📈 Estado Actual del Proyecto
 
-### Cumplido ✅
+### ✅ Completado (Primera Entrega)
 - [x] Diseño general de la app con interfaz moderna
 - [x] Todas las pantallas principales implementadas
 - [x] Navegación entre pantallas con Navigation Compose
@@ -63,56 +65,35 @@ Desarrollar una aplicación funcional en Android que gestione compras de superme
 - [x] Compartir lista por WhatsApp
 - [x] Gráficos y estadísticas
 - [x] Internacionalización básica (strings.xml)
-- [x] README actualizado
+- [x] SplashScreen mejorado con gradiente Emerald
+- [x] Corrección de crash al crear productos
+- [x] Permisos de cámara e internet agregados al Manifest
+- [x] requestLegacyExternalStorage habilitado
 
-### Pantallas Implementadas:
-1. **SplashScreen:** Pantalla de bienvenida (2-3 seg)
-2. **LoginScreen:** Inicio de sesión (interfaz)
-3. **RegisterScreen:** Registro de usuario (interfaz)
-4. **HomeScreen:** Resumen de presupuesto, gastos del día, gráficos circulares, accesos rápidos
-5. **ListaScreen:** Lista de compras con productos, filtros, búsqueda, animaciones
-6. **NuevaCompraScreen:** Registro de nueva compra (fecha, hora, supermercado, total)
-7. **DetalleCompraScreen:** Visualización detallada de una compra con sus productos
-8. **HistorialScreen:** Historial de compras ordenado por fecha
-9. **EstadisticasScreen:** Gráficos de gastos, evolución mensual, productos más comprados
-10. **TicketsScreen:** Gestión de tickets con cámara/galería, visualización de imágenes
-11. **OfertasScreen:** Promociones y ofertas disponibles
-12. **ProfileScreen:** Gestión de perfil, familia, tema, configuración
-13. **SettingsScreen:** Configuración de la aplicación
-14. **NotificationsScreen:** Notificaciones
-15. **FamilyMembersScreen:** Gestión de miembros familiares
-16. **MapaScreen:** Localización de comercios
+### 🔨 En Progreso
+- [ ] Mejora de diseño en LoginScreen
+- [x] Agregar campos faltantes en formulario de productos (código, descripción) ✅
+- [ ] **Cambiar icono de la app** (Usar Android Studio: File → New → Image Asset → "SA" + Emerald700) ⚠️
+- [ ] Completar AndroidManifest con todos los permisos necesarios
 
-## 🔮 Próximos Pasos (Futuro)
-
-### Para Segunda Entrega:
+## 🔮 Próximos Pasos (Segunda Entrega)
 - [ ] Migrar de JSON a **Room Database** (requerido por enunciado)
-- [ ] Implementar **Networking** con consumo de API externa (supermercados, promociones, precios)
+- [ ] Implementar **Networking** con consumo de API externa
 - [ ] Persistencia de sesión con **DataStore/SharedPreferences**
 - [ ] Validación real en Login/Registro
-- [ ] Cambiar **package name** a `com.undef.nombrealumno`
+- [ ] Cambiar **package name** a `com.undef.santiagossanchez`
 - [ ] Operaciones con corrutinas en base de datos
 - [ ] Menús y diálogos interactivos
 - [ ] Carga real de datos desde Room
 
-### Correcciones Pendientes (Detectadas):
-- [x] **CRÍTICO**: Agregar método `agregarProducto` en AppViewModel (causaba crash al crear producto) - **SOLUCIONADO**
-- [x] Mejorar diseño de SplashScreen (agregar logo, animaciones, indicador de carga, gradiente de fondo) - **MEJORADO**
-- [ ] Validación real en Login/Registro (actualmente solo interfaz visual)
+## 🔧 Correcciones Pendientes
+- [x] **CRÍTICO**: Crash al crear producto → **SOLUCIONADO**
+- [x] SplashScreen mejorado → **COMPLETADO**
+- [ ] Validación real en Login/Registro
 - [ ] Corregir navegación post-login para validar credenciales
-- [ ] Revisar diseño de LoginScreen (mejorar interfaz visual)
-- [ ] Agregar campo `código` y `descripción` en formulario de NewProductScreen
 - [ ] Verificar que todos los campos del Producto se guarden correctamente
-
-### Extras/Opcionales (Etapa Final):
-- [ ] Carga automática del ticket con IA/OCR
-- [ ] Chat para consultas sobre historial
-- [ ] Comparativa de precios entre supermercados
-- [ ] Notificaciones push
-- [ ] Exportación de datos
-- [ ] Filtros avanzados
-- [ ] Autenticación biométrica
-- [ ] Sincronización en la nube
+- [ ] Actualizar AndroidManifest.xml con permisos faltantes
+- [ ] **Cambiar icono de la app** ← NUEVO (Usar Android Studio: File → New → Image Asset)
 
 ## 📦 Instalación y Uso
 
@@ -130,6 +111,13 @@ git clone https://github.com/Sanchez-Santiago/Tecnologias-Moviles-FrontEnd.git
 export JAVA_HOME=/opt/android-studio/jbr
 ./gradlew assembleDebug
 ```
+
+5. **Generar Icono de la App** (Pendiente):
+   - En Android Studio: `File` → `New` → `Image Asset`
+   - Tipo: `Launcher Icons (Adaptive and Legacy)`
+   - Foreground: Texto "SA" (Super Ahorro), Color White
+   - Background: Color Emerald700 (#047857)
+   - Click `Next` → `Finish`
 
 ## 📸 Capturas de Pantalla
 (Próximamente)

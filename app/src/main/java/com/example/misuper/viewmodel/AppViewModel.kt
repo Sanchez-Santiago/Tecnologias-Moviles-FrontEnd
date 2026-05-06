@@ -73,6 +73,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun agregarProducto(listaId: String, producto: Producto) {
         viewModelScope.launch {
+            // Verificar si la lista existe, si no, crearla
+            val listaExiste = repository.listas.any { it.id == listaId }
+            if (!listaExiste) {
+                val nombreLista = if (listaId == "lista-familiar") "Lista Familiar" else "Lista Individual"
+                repository.agregarLista(ListaCompra(id = listaId, nombre = nombreLista))
+            }
+            
             repository.agregarOActualizarProducto(listaId, producto)
             refrescar()
         }

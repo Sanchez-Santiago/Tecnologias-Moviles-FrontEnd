@@ -33,8 +33,10 @@ import java.util.*
 @Composable
 fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onClose: () -> Unit) {
     var name by remember { mutableStateOf(itemToEdit?.nombre ?: "") }
+    var code by remember { mutableStateOf(itemToEdit?.codigo ?: "") }
     var brand by remember { mutableStateOf(itemToEdit?.marca ?: "") }
     var price by remember { mutableStateOf(itemToEdit?.precioEstimado?.toString() ?: "") }
+    var description by remember { mutableStateOf(itemToEdit?.descripcion ?: "") }
     var selectedCategory by remember { mutableStateOf(itemToEdit?.categoria ?: Categoria.ESENCIAL) }
     var quantity by remember { mutableIntStateOf(itemToEdit?.cantidad ?: 1) }
     
@@ -125,6 +127,15 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
+                FormField(label = "Código") {
+                    CustomTextField(
+                        value = code,
+                        onValueChange = { code = it },
+                        placeholder = "Ej: 7791234567890",
+                        leadingIcon = Icons.Default.QrCodeScanner
+                    )
+                }
+
                 FormField(label = "Nombre del Producto *") {
                     CustomTextField(
                         value = name,
@@ -161,6 +172,16 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                     }
                 }
 
+                FormField(label = "Descripción") {
+                    CustomTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        placeholder = "Descripción del producto",
+                        leadingIcon = Icons.Default.Description,
+                        height = 80.dp
+                    )
+                }
+
                 FormField(label = "Categoría") {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -190,9 +211,9 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                             
                             val newProduct = Producto(
                                 id = itemToEdit?.id ?: UUID.randomUUID().toString(),
-                                codigo = itemToEdit?.codigo ?: "",
+                                codigo = code,
                                 nombre = name,
-                                descripcion = itemToEdit?.descripcion ?: "",
+                                descripcion = description,
                                 precio = cleanPrice,
                                 marca = brand,
                                 precioEstimado = cleanPrice,
@@ -206,14 +227,7 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
                             val presupuestoActivo = viewModel.presupuestos.find { it.activo }
                             val listaId = if (presupuestoActivo?.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
                             
-                            // Verificar si la lista existe, si no, crearla
-                            val listaExiste = viewModel.listas.any { it.id == listaId }
-                            if (!listaExiste) {
-                                println("La lista $listaId no existe, creándola...")
-                                viewModel.agregarLista(ListaCompra(id = listaId, nombre = if (listaId == "lista-familiar") "Lista Familiar" else "Lista Individual"))
-                            }
-                            
-                            println("Intentando guardar producto: $newProduct en lista: $listaId")
+                            println("DEBUG: Intentando guardar producto: $newProduct en lista: $listaId")
                             viewModel.agregarProducto(listaId, newProduct)
                             onClose()
                         }
