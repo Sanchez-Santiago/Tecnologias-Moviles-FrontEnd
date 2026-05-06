@@ -19,23 +19,31 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.misuper.data.model.Categoria
+import com.example.misuper.data.model.Presupuesto
+import com.example.misuper.data.model.Usuario
 import com.example.misuper.ui.theme.*
+import com.example.misuper.viewmodel.AppViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
-fun HomeScreen() {
-    val purchases = listOf(
-        Triple("Carrefour", "12 Oct 2023", "$45.200"),
-        Triple("Coto", "10 Oct 2023", "$12.800"),
-        Triple("Jumbo", "08 Oct 2023", "$32.150")
-    )
+fun HomeScreen(
+    viewModel: AppViewModel,
+    onNavigateToNotifications: () -> Unit,
+    onNavigateToFamily: () -> Unit
+) {
+    val presupuestoActivo = viewModel.presupuestos.find { it.activo }
+    val tickets = viewModel.tickets
+        .filter { it.presupuestoId == presupuestoActivo?.id }
+        .sortedByDescending { it.fechaHora }
+        .take(3)
 
     Scaffold(
-        topBar = { Header() },
+        topBar = { Header(onNavigateToNotifications) },
         containerColor = Slate950
     ) { padding ->
         LazyColumn(
@@ -48,11 +56,39 @@ fun HomeScreen() {
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
             
-            item { ModeSelector() }
+            item { 
+                ModeSelector(
+                    activeId = presupuestoActivo?.id ?: "",
+                    onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
+                ) 
+            }
 
-            item { BudgetHero() }
+            item { 
+                presupuestoActivo?.let { presupuesto ->
+                    val listaId = if (presupuesto.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
+                    val estimados = viewModel.getEstimadosPorCategoria(listaId)
+                    
+                    BudgetHero(
+                        presupuesto = presupuesto,
+                        estimados = estimados,
+                        onEditBudget = { nuevoMonto ->
+                            viewModel.actualizarPresupuesto(presupuesto.id, nuevoMonto)
+                        }
+                    )
+                }
+            }
 
-            item { AccumulatedSavingsCard() }
+            item { 
+                NewMembersSection(
+                    members = viewModel.usuarios,
+                    onAddClick = onNavigateToFamily
+                )
+            }
+
+            item { 
+                val totalGastado = viewModel.tickets.sumOf { it.total }
+                AccumulatedSavingsCard(totalGastado) 
+            }
 
             item { AITipCard() }
 
@@ -66,8 +102,17 @@ fun HomeScreen() {
                             fontWeight = FontWeight.Black
                         )
                     )
-                    purchases.forEach { (supermarket, date, amount) ->
-                        PurchaseRow(supermarket, date, amount)
+                    if (tickets.isEmpty()) {
+                        Text("No hay compras registradas", color = Slate500, fontSize = 12.sp)
+                    } else {
+                        tickets.forEach { ticket ->
+                            val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                            PurchaseRow(
+                                ticket.supermercado, 
+                                sdf.format(Date(ticket.fechaHora)), 
+                                formatPrice(ticket.total)
+                            )
+                        }
                     }
                 }
             }
@@ -75,8 +120,13 @@ fun HomeScreen() {
     }
 }
 
+fun formatPrice(amount: Int): String {
+    val formatter = java.text.DecimalFormat("$#,###.###", java.text.DecimalFormatSymbols(Locale("es", "AR")))
+    return formatter.format(amount).replace(",", ".")
+}
+
 @Composable
-fun Header() {
+fun Header(onNotificationsClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Slate950.copy(alpha = 0.9f),
@@ -112,7 +162,7 @@ fun Header() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
                     IconButton(
-                        onClick = { },
+                        onClick = onNotificationsClick,
                         modifier = Modifier
                             .size(40.dp)
                             .background(Slate900, CircleShape)
@@ -152,28 +202,27 @@ fun Header() {
 }
 
 @Composable
-fun ModeSelector() {
-    var isIndividual by remember { mutableStateOf(true) }
-
+fun ModeSelector(activeId: String, onModeChange: (String) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(64.dp)
             .background(Slate900, RoundedCornerShape(32.dp))
             .border(1.dp, Slate800, RoundedCornerShape(32.dp))
-            .padding(4.dp)
+            .padding(6.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
+            val isIndividual = activeId == "presupuesto-individual"
             SelectorItem(
                 text = "INDIVIDUAL",
                 isSelected = isIndividual,
-                onClick = { isIndividual = true },
+                onClick = { onModeChange("presupuesto-individual") },
                 modifier = Modifier.weight(1f)
             )
             SelectorItem(
                 text = "FAMILIAR",
                 isSelected = !isIndividual,
-                onClick = { isIndividual = false },
+                onClick = { onModeChange("presupuesto-familiar") },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -186,8 +235,7 @@ fun SelectorItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(28.dp))
-            .background(if (isSelected) White else Color.Transparent)
-            .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Slate800 else Color.Transparent, RoundedCornerShape(28.dp))
+            .background(if (isSelected) Emerald500 else Color.Transparent)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -196,7 +244,7 @@ fun SelectorItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
             style = MaterialTheme.typography.labelSmall.copy(
                 color = if (isSelected) Slate950 else Slate400,
                 fontWeight = FontWeight.Black,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 letterSpacing = 2.sp
             )
         )
@@ -204,10 +252,18 @@ fun SelectorItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
 }
 
 @Composable
-fun BudgetHero() {
-    val budget = 120000.0
-    val spent = 84200.0
-    val ratio = (spent / budget).toFloat()
+fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditBudget: (Int) -> Unit) {
+    var showEditDialog by remember { mutableStateOf(false) }
+    
+    val totalMonto = if (presupuesto.montoTotal <= 0) 1 else presupuesto.montoTotal
+    
+    val esenTotal = estimados[Categoria.ESENCIAL] ?: 0
+    val prinTotal = estimados[Categoria.PRINCIPAL] ?: 0
+    val secTotal = estimados[Categoria.SECUNDARIO] ?: 0
+    
+    val ratioEsen = (esenTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
+    val ratioPrin = (prinTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
+    val ratioSec = (secTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -215,10 +271,10 @@ fun BudgetHero() {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Box(
-            modifier = Modifier.size(176.dp),
+            modifier = Modifier.size(160.dp),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.size(176.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
                 drawArc(
                     color = Slate800,
                     startAngle = 0f,
@@ -229,46 +285,96 @@ fun BudgetHero() {
                 drawArc(
                     color = Emerald500,
                     startAngle = -90f,
-                    sweepAngle = 360f * ratio,
+                    sweepAngle = 360f * ratioEsen,
+                    useCenter = false,
+                    style = Stroke(width = 12.dp.toPx())
+                )
+                drawArc(
+                    color = Blue500,
+                    startAngle = -90f + (360f * ratioEsen),
+                    sweepAngle = 360f * ratioPrin,
+                    useCenter = false,
+                    style = Stroke(width = 12.dp.toPx())
+                )
+                drawArc(
+                    color = Amber500,
+                    startAngle = -90f + (360f * (ratioEsen + ratioPrin)),
+                    sweepAngle = 360f * ratioSec,
                     useCenter = false,
                     style = Stroke(width = 12.dp.toPx())
                 )
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { showEditDialog = true }
+            ) {
                 Text(
-                    "PRESUPUESTO",
+                    "DISPONIBLE",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = Slate400,
-                        fontSize = 10.sp,
+                        color = Emerald500,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp
                     )
                 )
                 Text(
-                    "$120.000",
+                    formatPrice(presupuesto.montoDisponible),
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        color = Slate50,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
+                        color = White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 28.sp
                     )
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Ahorrado: $35.800",
+                    "TOTAL: ${formatPrice(presupuesto.montoTotal)}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = Emerald500,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
+                        color = Slate400,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 )
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendItem(Emerald500, "ESENCIALES", "$42.000")
-            LegendItem(Blue500, "SECUNDARIOS", "$25.000")
-            LegendItem(Indigo600, "EXTRAS", "$17.200")
+        Column(
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(start = 8.dp)
+        ) {
+            LegendItem(Emerald500, "ESENCIAL", formatPrice(esenTotal))
+            LegendItem(Blue500, "PRINCIPAL", formatPrice(prinTotal))
+            LegendItem(Amber500, "SECUNDARIO", formatPrice(secTotal))
         }
+    }
+
+    if (showEditDialog) {
+        var newAmount by remember { mutableStateOf(presupuesto.montoTotal.toString()) }
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            containerColor = Slate900,
+            title = { Text("Editar Presupuesto", color = White) },
+            text = {
+                TextField(
+                    value = newAmount,
+                    onValueChange = { newAmount = it },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Slate800,
+                        unfocusedContainerColor = Slate800,
+                        focusedTextColor = White,
+                        unfocusedTextColor = White
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { 
+                    val cleaned = newAmount.filter { it.isDigit() }.toIntOrNull() ?: 0
+                    onEditBudget(cleaned)
+                    showEditDialog = false 
+                }) {
+                    Text("GUARDAR", color = Emerald500)
+                }
+            }
+        )
     }
 }
 
@@ -299,7 +405,7 @@ fun LegendItem(color: Color, label: String, value: String) {
 }
 
 @Composable
-fun AccumulatedSavingsCard() {
+fun AccumulatedSavingsCard(total: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(40.dp),
@@ -341,11 +447,11 @@ fun AccumulatedSavingsCard() {
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Ahorro acumulado",
+                        "Gasto Total",
                         style = MaterialTheme.typography.labelSmall.copy(color = Slate400, fontSize = 10.sp)
                     )
                     Text(
-                        "$312.450",
+                        formatPrice(total),
                         style = MaterialTheme.typography.headlineLarge.copy(
                             color = White,
                             fontWeight = FontWeight.Bold,
@@ -353,15 +459,6 @@ fun AccumulatedSavingsCard() {
                         )
                     )
                 }
-
-                Text(
-                    "+$12.5k",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        color = Emerald500,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    )
-                )
             }
         }
     }
@@ -386,14 +483,27 @@ fun AITipCard() {
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(
-                    "TIP DE AHORRO",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = White.copy(alpha = 0.8f),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "TIP DE AHORRO (IA)",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = White.copy(alpha = 0.8f),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
                     )
-                )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        color = White.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            "PRÓXIMAMENTE",
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(color = White, fontSize = 7.sp)
+                        )
+                    }
+                }
                 Text(
                     "Estás gastando un 12% menos que el mes pasado en lácteos.",
                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -453,6 +563,3 @@ fun PurchaseRow(supermarket: String, date: String, amount: String) {
         )
     }
 }
-
-// No custom extension needed if importing correct one
-

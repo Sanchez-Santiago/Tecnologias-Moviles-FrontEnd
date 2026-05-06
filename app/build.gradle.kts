@@ -40,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.code.gson:gson:2.10.1")
     implementation(platform("androidx.compose:compose-bom:2024.12.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")

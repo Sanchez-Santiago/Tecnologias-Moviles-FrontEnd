@@ -1,10 +1,13 @@
 package com.example.misuper.ui.screens.tickets
 
+import android.app.DatePickerDialog
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,57 +24,48 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.misuper.data.model.MetodoPago
+import com.example.misuper.data.model.Ticket
+import com.example.misuper.data.model.TicketProducto
+import com.example.misuper.ui.screens.inicio.ModeSelector
 import com.example.misuper.ui.theme.*
-import java.util.Locale
-
-data class TicketProduct(val name: String, val code: String, val price: Double)
-data class Ticket(
-    val supermarket: String,
-    val total: Double,
-    val date: String,
-    val time: String,
-    val products: List<TicketProduct> = emptyList()
-)
+import com.example.misuper.viewmodel.AppViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
-fun TicketsScreen() {
+fun TicketsScreen(viewModel: AppViewModel) {
     var showModal by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var ticketToEdit by remember { mutableStateOf<Ticket?>(null) }
     
-    val tickets = remember {
-        mutableStateListOf(
-            Ticket("Carrefour", 45200.0, "12 OCT 2023", "14:30", listOf(
-                TicketProduct("Leche Larga Vida", "779123456", 1200.0),
-                TicketProduct("Pan Lactal", "779876543", 2500.0),
-                TicketProduct("Yogurt Griego", "779456123", 1800.0)
-            )),
-            Ticket("Coto", 12800.0, "10 OCT 2023", "18:15", listOf(
-                TicketProduct("Arroz Gallo Oro", "779001122", 950.0),
-                TicketProduct("Fideos Tallarin", "779334455", 800.0)
-            )),
-            Ticket("Jumbo", 32150.0, "08 OCT 2023", "11:00", listOf(
-                TicketProduct("Bife de Chorizo", "1001", 15400.0),
-                TicketProduct("Vino Malbec", "779998877", 6500.0)
-            ))
-        )
-    }
+    val presupuestoActivo = viewModel.presupuestos.find { it.activo }
+    val tickets = viewModel.tickets.filter { it.presupuestoId == presupuestoActivo?.id }
 
     val filteredTickets = tickets.filter { ticket ->
-        ticket.supermarket.contains(searchQuery, ignoreCase = true) ||
-        ticket.date.contains(searchQuery, ignoreCase = true) ||
+        ticket.supermercado.contains(searchQuery, ignoreCase = true) ||
         ticket.total.toString().contains(searchQuery) ||
-        ticket.products.any { it.name.contains(searchQuery, ignoreCase = true) }
+        ticket.productos.any { it.nombre.contains(searchQuery, ignoreCase = true) }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Slate950)) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                Column {
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                        ModeSelector(
+                            activeId = presupuestoActivo?.id ?: "",
+                            onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
+                        )
+                    }
                     TicketsHeader()
                     SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
                 }
@@ -88,16 +82,43 @@ fun TicketsScreen() {
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
             ) {
-                items(filteredTickets) { ticket ->
-                    TicketCard(ticket)
+                if (filteredTickets.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                            Text("No hay tickets en este modo", color = Slate500, fontSize = 14.sp)
+                        }
+                    }
+                }
+                items(filteredTickets, key = { it.id }) { ticket ->
+                    TicketCard(
+                        ticket = ticket,
+                        onDelete = { viewModel.eliminarTicket(ticket.id) },
+                        onEdit = { ticketToEdit = ticket }
+                    )
                 }
             }
         }
 
         if (showModal) {
-            RegisterPurchaseModal(onClose = { showModal = false })
+            RegisterPurchaseModal(
+                viewModel = viewModel,
+                onClose = { showModal = false }
+            )
+        }
+
+        if (ticketToEdit != null) {
+            RegisterPurchaseModal(
+                viewModel = viewModel,
+                ticketToEdit = ticketToEdit,
+                onClose = { ticketToEdit = null }
+            )
         }
     }
+}
+
+fun formatPrice(amount: Int): String {
+    val formatter = java.text.DecimalFormat("$#,###.###", java.text.DecimalFormatSymbols(Locale("es", "AR")))
+    return formatter.format(amount).replace(",", ".")
 }
 
 @Composable
@@ -154,9 +175,8 @@ fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
 fun TicketsHeader() {
     Row(
         modifier = Modifier
-            .statusBarsPadding()
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 20.dp),
+            .padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -173,8 +193,11 @@ fun TicketsHeader() {
 }
 
 @Composable
-fun TicketCard(ticket: Ticket) {
+fun TicketCard(ticket: Ticket, onDelete: () -> Unit, onEdit: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    var showAttachment by remember { mutableStateOf(false) }
+    val sdfDate = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+    val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     Card(
         modifier = Modifier
@@ -208,7 +231,7 @@ fun TicketCard(ticket: Ticket) {
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        ticket.supermarket,
+                        ticket.supermercado,
                         style = MaterialTheme.typography.titleMedium.copy(
                             color = White,
                             fontWeight = FontWeight.Bold,
@@ -222,7 +245,7 @@ fun TicketCard(ticket: Ticket) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Icon(Icons.Default.CalendarToday, null, tint = Slate500, modifier = Modifier.size(10.dp))
                             Text(
-                                ticket.date,
+                                sdfDate.format(Date(ticket.fechaHora)),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = Slate500,
                                     fontWeight = FontWeight.Black,
@@ -233,7 +256,7 @@ fun TicketCard(ticket: Ticket) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Icon(Icons.Default.AccessTime, null, tint = Slate500, modifier = Modifier.size(10.dp))
                             Text(
-                                ticket.time,
+                                sdfTime.format(Date(ticket.fechaHora)),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = Slate500,
                                     fontWeight = FontWeight.Black,
@@ -245,7 +268,7 @@ fun TicketCard(ticket: Ticket) {
                 }
 
                 Text(
-                    "$${String.format(Locale.getDefault(), "%,.0f", ticket.total)}",
+                    formatPrice(ticket.total),
                     style = MaterialTheme.typography.titleMedium.copy(
                         color = Emerald500,
                         fontWeight = FontWeight.Bold,
@@ -280,21 +303,38 @@ fun TicketCard(ticket: Ticket) {
                             )
                         )
                         
-                        TextButton(
-                            onClick = { /* Delete logic */ },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Delete, null, tint = Rose500, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("ELIMINAR", color = Rose500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (ticket.imagenPath.isNotEmpty()) {
+                                IconButton(onClick = { showAttachment = true }, modifier = Modifier.size(24.dp)) {
+                                    Icon(Icons.Default.Visibility, "Ver Ticket", tint = Emerald500, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            TextButton(
+                                onClick = onEdit,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Edit, null, tint = Blue500, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("EDITAR", color = Blue500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            TextButton(
+                                onClick = onDelete,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Delete, null, tint = Rose500, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("ELIMINAR", color = Rose500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    ticket.products.forEach { product ->
+                    ticket.productos.forEach { product ->
                         ProductItemRow(product)
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -302,10 +342,42 @@ fun TicketCard(ticket: Ticket) {
             }
         }
     }
+
+    if (showAttachment) {
+        AlertDialog(
+            onDismissRequest = { showAttachment = false },
+            containerColor = Slate900,
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Comprobante adjunto", color = White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Slate800),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (ticket.imagenPath.contains(".pdf")) Icons.Default.PictureAsPdf else Icons.Default.Image,
+                            contentDescription = null,
+                            tint = Slate500,
+                            modifier = Modifier.size(64.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAttachment = false }) {
+                    Text("CERRAR", color = Emerald500)
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun ProductItemRow(product: TicketProduct) {
+fun ProductItemRow(product: TicketProducto) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -316,11 +388,11 @@ fun ProductItemRow(product: TicketProduct) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column {
-            Text(product.name, color = White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text(product.code, color = Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(product.nombre, color = White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text("x${product.cantidad}", color = Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
         Text(
-            "$${String.format(Locale.getDefault(), "%,.0f", product.price)}",
+            formatPrice(product.precio),
             color = White,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
@@ -329,24 +401,44 @@ fun ProductItemRow(product: TicketProduct) {
 }
 
 @Composable
-fun RegisterPurchaseModal(onClose: () -> Unit) {
-    var supermarket by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("") }
-    var total by remember { mutableStateOf("") }
-    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance()
+    if (ticketToEdit != null) calendar.timeInMillis = ticketToEdit.fechaHora
+    
+    var supermarket by remember { mutableStateOf(ticketToEdit?.supermercado ?: "") }
+    var dateMillis by remember { mutableLongStateOf(ticketToEdit?.fechaHora ?: System.currentTimeMillis()) }
+    var total by remember { mutableStateOf(ticketToEdit?.total?.toString() ?: "") }
+    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+
+    val datePicker = DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val selected = Calendar.getInstance()
+            selected.set(year, month, dayOfMonth)
+            dateMillis = selected.timeInMillis
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
-        // Logic to handle captured image
+        capturedBitmap = bitmap
+        selectedUri = null
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        capturedImageUri = uri
+        selectedUri = uri
+        capturedBitmap = null
     }
+
+    val isValid = supermarket.isNotBlank() && total.isNotBlank()
 
     Box(
         modifier = Modifier
@@ -370,7 +462,7 @@ fun RegisterPurchaseModal(onClose: () -> Unit) {
             ) {
                 Column {
                     Text(
-                        "Registrar Compra",
+                        if (ticketToEdit == null) "Registrar Compra" else "Editar Compra",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             color = White,
                             fontSize = 24.sp,
@@ -396,25 +488,28 @@ fun RegisterPurchaseModal(onClose: () -> Unit) {
                 ModalTextField(
                     value = supermarket,
                     onValueChange = { supermarket = it },
-                    placeholder = "Súper",
+                    placeholder = "Comercio / Súper *",
                     leadingIcon = Icons.Default.Store
                 )
                 
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        ModalTextField(
-                            value = date,
-                            onValueChange = { date = it },
-                            placeholder = "Fecha",
-                            leadingIcon = Icons.Default.CalendarToday
-                        )
-                    }
-                    Box(modifier = Modifier.weight(1f)) {
-                        ModalTextField(
-                            value = time,
-                            onValueChange = { time = it },
-                            placeholder = "Hora",
-                            leadingIcon = Icons.Default.AccessTime
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, Slate700.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .clickable { datePicker.show() },
+                    color = Slate800
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.CalendarToday, null, tint = Slate500, modifier = Modifier.size(18.dp))
+                        Text(
+                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(dateMillis)),
+                            color = Slate100
                         )
                     }
                 }
@@ -422,9 +517,10 @@ fun RegisterPurchaseModal(onClose: () -> Unit) {
                 ModalTextField(
                     value = total,
                     onValueChange = { total = it },
-                    placeholder = "Precio Total",
+                    placeholder = "Precio Total *",
                     leadingIcon = Icons.Default.LocalOffer,
-                    isLarge = true
+                    isLarge = true,
+                    keyboardType = KeyboardType.Number
                 )
 
                 Row(
@@ -440,11 +536,11 @@ fun RegisterPurchaseModal(onClose: () -> Unit) {
                             .clip(RoundedCornerShape(16.dp))
                             .clickable { cameraLauncher.launch(null) },
                         shape = RoundedCornerShape(16.dp),
-                        color = if (capturedImageUri != null) Emerald600.copy(alpha = 0.1f) else Slate800,
-                        border = BorderStroke(1.dp, if (capturedImageUri != null) Emerald500 else Slate700.copy(alpha = 0.5f))
+                        color = if (capturedBitmap != null) Emerald600.copy(alpha = 0.1f) else Slate800,
+                        border = BorderStroke(1.dp, if (capturedBitmap != null) Emerald500 else Slate700.copy(alpha = 0.5f))
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            if (capturedImageUri != null) {
+                            if (capturedBitmap != null) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CheckCircle, null, tint = Emerald500, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -461,15 +557,51 @@ fun RegisterPurchaseModal(onClose: () -> Unit) {
                     // Gallery Button
                     Surface(
                         modifier = Modifier
-                            .size(64.dp)
+                            .weight(1f)
+                            .height(64.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { galleryLauncher.launch("image/*") },
+                            .clickable { galleryLauncher.launch("*/*") }, 
                         shape = RoundedCornerShape(16.dp),
-                        color = Slate800,
-                        border = BorderStroke(1.dp, Slate700.copy(alpha = 0.5f))
+                        color = if (selectedUri != null) Blue600.copy(alpha = 0.1f) else Slate800,
+                        border = BorderStroke(1.dp, if (selectedUri != null) Blue500 else Slate700.copy(alpha = 0.5f))
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Image, null, tint = Slate400, modifier = Modifier.size(24.dp))
+                            if (selectedUri != null) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AttachFile, null, tint = Blue500, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("ADJUNTO", color = Blue500, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            } else {
+                                Icon(Icons.Default.FileUpload, null, tint = Slate400, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+                }
+                
+                // Preview
+                if (capturedBitmap != null || selectedUri != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Slate800)
+                            .border(1.dp, Slate700, RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (capturedBitmap != null) {
+                            Image(
+                                bitmap = capturedBitmap!!.asImageBitmap(),
+                                contentDescription = "Vista previa",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Description, null, tint = Blue500)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Archivo seleccionado", color = White)
+                            }
                         }
                     }
                 }
@@ -478,18 +610,49 @@ fun RegisterPurchaseModal(onClose: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { /* Save logic */ },
+                onClick = {
+                    if (isValid) {
+                        val cleanPrice = total.filter { it.isDigit() }.toIntOrNull() ?: 0
+                        
+                        val path = capturedBitmap?.let { "camera_img_${UUID.randomUUID()}" } 
+                                 ?: selectedUri?.toString() 
+                                 ?: ticketToEdit?.imagenPath 
+                                 ?: ""
+
+                        val ticket = Ticket(
+                            id = ticketToEdit?.id ?: UUID.randomUUID().toString(),
+                            supermercado = supermarket,
+                            direccion = ticketToEdit?.direccion ?: "Dirección",
+                            fechaHora = dateMillis,
+                            total = cleanPrice,
+                            metodoPago = ticketToEdit?.metodoPago ?: MetodoPago.EFECTIVO,
+                            imagenPath = path,
+                            presupuestoId = ticketToEdit?.presupuestoId ?: "", // El repo asignará el activo si es nuevo
+                            productos = ticketToEdit?.productos ?: emptyList()
+                        )
+                        if (ticketToEdit == null) {
+                            viewModel.agregarTicket(ticket)
+                        } else {
+                            viewModel.actualizarTicket(ticket)
+                        }
+                        onClose()
+                    }
+                },
+                enabled = isValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Emerald600,
+                    disabledContainerColor = Slate800
+                ),
                 shape = RoundedCornerShape(16.dp),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
             ) {
                 Text(
                     "GUARDAR COMPRA",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = White,
+                        color = if (isValid) White else Slate500,
                         fontWeight = FontWeight.Black,
                         fontSize = 14.sp,
                         letterSpacing = 2.8.sp
@@ -508,7 +671,8 @@ fun ModalTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     leadingIcon: ImageVector,
-    isLarge: Boolean = false
+    isLarge: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text
 ) {
     TextField(
         value = value,
@@ -540,6 +704,7 @@ fun ModalTextField(
         textStyle = MaterialTheme.typography.bodyLarge.copy(
             fontSize = if (isLarge) 18.sp else 16.sp,
             fontWeight = if (isLarge) FontWeight.Bold else FontWeight.Normal
-        )
+        ),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType)
     )
 }

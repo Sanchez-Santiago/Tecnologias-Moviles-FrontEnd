@@ -23,49 +23,55 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.misuper.data.model.Producto
+import com.example.misuper.ui.screens.inicio.ModeSelector
 import com.example.misuper.ui.theme.*
-
-data class ShoppingItem(
-    val id: Int,
-    val name: String,
-    val quantity: Int,
-    val category: String,
-    val estPrice: Double,
-    val realPrice: Double,
-    val isChecked: Boolean = false
-)
+import com.example.misuper.viewmodel.AppViewModel
+import java.util.Locale
 
 @Composable
-fun ListaScreen() {
+fun ListaScreen(viewModel: AppViewModel) {
     var selectedFilter by remember { mutableStateOf("TODOS") }
     var searchQuery by remember { mutableStateOf("") }
     var showAddItemModal by remember { mutableStateOf(false) }
-    var editingItem by remember { mutableStateOf<ShoppingItem?>(null) }
+    var editingItem by remember { mutableStateOf<Producto?>(null) }
     
-    val items = remember {
-        mutableStateListOf(
-            ShoppingItem(1, "Leche Entera", 2, "ESENCIALES", 1200.0, 1150.0),
-            ShoppingItem(2, "Pan Tajado", 1, "ESENCIALES", 800.0, 850.0, true),
-            ShoppingItem(3, "Vino Tinto", 1, "EXTRAS", 4500.0, 4200.0),
-            ShoppingItem(4, "Detergente", 1, "SECUNDARIOS", 2500.0, 2600.0),
-            ShoppingItem(5, "Yogurt Griego", 3, "SECUNDARIOS", 900.0, 950.0)
-        )
-    }
+    val presupuestoActivo = viewModel.presupuestos.find { it.activo }
+    val isFamiliar = presupuestoActivo?.id == "presupuesto-familiar"
+    val listaActualId = if (isFamiliar) "lista-familiar" else "lista-individual"
+    
+    val listaActual = viewModel.listas.find { it.id == listaActualId }
+    val items = listaActual?.productos ?: emptyList<Producto>()
 
     val filteredItems = items.filter { item ->
-        val matchesFilter = if (selectedFilter == "TODOS") true else item.category == selectedFilter
-        val matchesQuery = item.name.contains(searchQuery, ignoreCase = true) ||
-                item.category.contains(searchQuery, ignoreCase = true) ||
-                item.estPrice.toString().contains(searchQuery) ||
-                item.realPrice.toString().contains(searchQuery)
+        val matchesFilter = if (selectedFilter == "TODOS") true else item.categoria.name == selectedFilter
+        val matchesQuery = item.nombre.contains(searchQuery, ignoreCase = true) ||
+                item.categoria.name.contains(searchQuery, ignoreCase = true) ||
+                item.precioEstimado.toString().contains(searchQuery)
         matchesFilter && matchesQuery
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = Slate950,
+            topBar = {
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                        ModeSelector(
+                            activeId = presupuestoActivo?.id ?: "",
+                            onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
+                }
+            },
             floatingActionButton = { FabAddItem(onClick = { showAddItemModal = true }) },
-            bottomBar = { ShoppingSummary() }
+            bottomBar = { 
+                val totalEst = items.sumOf { it.precioEstimado * it.cantidad }
+                val totalReal = items.filter { it.comprado }.sumOf { (it.precioReal ?: it.precioEstimado) * it.cantidad }
+                ShoppingSummary(totalEst, totalReal) 
+            }
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -74,16 +80,14 @@ fun ListaScreen() {
                     .padding(horizontal = 24.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
-
                 PriorityFilters(
                     selectedFilter = selectedFilter,
                     onFilterSelected = { selectedFilter = it },
                     counts = mapOf(
                         "TODOS" to items.size,
-                        "ESENCIALES" to items.count { it.category == "ESENCIALES" },
-                        "SECUNDARIOS" to items.count { it.category == "SECUNDARIOS" },
-                        "EXTRAS" to items.count { it.category == "EXTRAS" }
+                        "ESENCIAL" to items.count { it.categoria.name == "ESENCIAL" },
+                        "PRINCIPAL" to items.count { it.categoria.name == "PRINCIPAL" },
+                        "SECUNDARIO" to items.count { it.categoria.name == "SECUNDARIO" }
                     )
                 )
 
@@ -93,16 +97,16 @@ fun ListaScreen() {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
+                        contentPadding = PaddingValues(bottom = 100.dp)
                     ) {
                         items(filteredItems, key = { it.id }) { item ->
                             ItemCard(
                                 item = item,
-                                onCheckedChange = { checked ->
-                                    val index = items.indexOfFirst { it.id == item.id }
-                                    if (index != -1) items[index] = item.copy(isChecked = checked)
+                                onCheckedChange = { _ ->
+                                    viewModel.toggleProducto(listaActualId, item.id)
                                 },
-                                onEdit = { editingItem = item }
+                                onEdit = { editingItem = item },
+                                onDelete = { viewModel.eliminarProducto(listaActualId, item.id) }
                             )
                         }
                     }
@@ -111,44 +115,51 @@ fun ListaScreen() {
         }
 
         if (showAddItemModal) {
-            NewProductScreen(onClose = { showAddItemModal = false })
+            NewProductScreen(viewModel = viewModel, onClose = { showAddItemModal = false })
         }
         
         if (editingItem != null) {
-            NewProductScreen(itemToEdit = editingItem, onClose = { editingItem = null })
+            NewProductScreen(viewModel = viewModel, itemToEdit = editingItem, onClose = { editingItem = null })
         }
     }
 }
 
+fun formatPrice(amount: Int): String {
+    val formatter = java.text.DecimalFormat("$#,###.###", java.text.DecimalFormatSymbols(Locale("es", "AR")))
+    return formatter.format(amount).replace(",", ".")
+}
+
 @Composable
 fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
-    TextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, Slate800, RoundedCornerShape(16.dp)),
-        placeholder = { Text("Buscar producto o precio...", color = Slate500, fontSize = 14.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Slate500) },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Close, contentDescription = null, tint = Slate500)
+    Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, Slate800, RoundedCornerShape(16.dp)),
+            placeholder = { Text("Buscar producto o precio...", color = Slate500, fontSize = 14.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Slate500) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = null, tint = Slate500)
+                    }
                 }
-            }
-        },
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Slate900,
-            unfocusedContainerColor = Slate900,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = Emerald500,
-            focusedTextColor = White,
-            unfocusedTextColor = White
-        ),
-        singleLine = true
-    )
+            },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Slate900,
+                unfocusedContainerColor = Slate900,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = Emerald500,
+                focusedTextColor = White,
+                unfocusedTextColor = White
+            ),
+            singleLine = true
+        )
+    }
 }
 
 @Composable
@@ -157,7 +168,7 @@ fun PriorityFilters(
     onFilterSelected: (String) -> Unit,
     counts: Map<String, Int>
 ) {
-    val filters = listOf("TODOS", "ESENCIALES", "SECUNDARIOS", "EXTRAS")
+    val filters = listOf("TODOS", "ESENCIAL", "PRINCIPAL", "SECUNDARIO")
     
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -181,9 +192,9 @@ fun FilterButton(
 ) {
     val backgroundColor = if (isSelected) {
         when (text) {
-            "ESENCIALES" -> Emerald600
-            "SECUNDARIOS" -> Blue600
-            "EXTRAS" -> Amber600
+            "ESENCIAL" -> Emerald600
+            "PRINCIPAL" -> Blue600
+            "SECUNDARIO" -> Amber600
             else -> Slate700
         }
     } else Slate900
@@ -233,68 +244,55 @@ fun FilterButton(
 }
 
 @Composable
-fun ItemCard(item: ShoppingItem, onCheckedChange: (Boolean) -> Unit, onEdit: () -> Unit) {
-    var isPressing by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (isPressing) 0.98f else 1f)
-    
-    val categoryColor = when (item.category) {
-        "ESENCIALES" -> Emerald500
-        "SECUNDARIOS" -> Blue500
-        "EXTRAS" -> Amber500
+fun ItemCard(item: Producto, onCheckedChange: (Boolean) -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val categoryColor = when (item.categoria.name) {
+        "ESENCIAL" -> Emerald500
+        "PRINCIPAL" -> Blue500
+        "SECUNDARIO" -> Amber500
         else -> Slate400
     }
 
     val borderColor by animateColorAsState(
-        if (item.isChecked) categoryColor.copy(alpha = 0.3f) else categoryColor
+        if (item.comprado) categoryColor.copy(alpha = 0.3f) else categoryColor
     )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
             .border(2.dp, borderColor, RoundedCornerShape(24.dp))
             .clip(RoundedCornerShape(24.dp))
-            .clickable { 
-                onCheckedChange(!item.isChecked)
-            },
+            .clickable { onCheckedChange(!item.comprado) },
         colors = CardDefaults.cardColors(containerColor = Slate900.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CustomCheckbox(isChecked = item.isChecked)
-                
+                CustomCheckbox(isChecked = item.comprado)
                 Spacer(modifier = Modifier.width(12.dp))
-                
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = item.name,
+                            text = item.nombre,
                             style = MaterialTheme.typography.bodyLarge.copy(
-                                color = if (item.isChecked) Slate100.copy(alpha = 0.4f) else Slate100,
+                                color = if (item.comprado) Slate100.copy(alpha = 0.4f) else Slate100,
                                 fontWeight = FontWeight.Bold,
-                                textDecoration = if (item.isChecked) TextDecoration.LineThrough else null
+                                textDecoration = if (item.comprado) TextDecoration.LineThrough else null
                             )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "x${item.quantity}",
+                            text = "x${item.cantidad}",
                             style = MaterialTheme.typography.bodySmall.copy(color = Slate500)
                         )
                     }
                 }
                 
-                // Indicador visual de categoría (opcional si ya está en el borde, pero lo mantenemos sutil)
-                Box(
-                    modifier = Modifier
-                        .background(categoryColor.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        item.category.take(1),
-                        color = categoryColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Edit, "Editar", tint = Slate500, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Delete, "Eliminar", tint = Rose500.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                    }
                 }
             }
             
@@ -306,32 +304,18 @@ fun ItemCard(item: ShoppingItem, onCheckedChange: (Boolean) -> Unit, onEdit: () 
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Est: $${item.estPrice}",
+                    text = "Est: ${formatPrice(item.precioEstimado)}",
                     style = MaterialTheme.typography.bodySmall.copy(color = Slate500, fontSize = 12.sp)
                 )
                 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "$${item.realPrice}",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = Emerald500,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
+                Text(
+                    text = formatPrice(item.precioReal ?: item.precioEstimado),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = Emerald500,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    IconButton(
-                        onClick = onEdit,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Editar",
-                            tint = Slate500,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                )
             }
         }
     }
@@ -356,43 +340,39 @@ fun CustomCheckbox(isChecked: Boolean) {
 }
 
 @Composable
-fun ShoppingSummary() {
+fun ShoppingSummary(totalEst: Int, totalReal: Int) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Slate900.copy(alpha = 0.8f),
         tonalElevation = 0.dp
     ) {
-        // Backdrop blur effect
-        Box(modifier = Modifier.fillMaxWidth()) {
-            // Note: Box with blur modifier needs a size. We use Column content instead.
-            Column {
-                LinearProgressIndicator(
-                    progress = { 0.65f },
-                    modifier = Modifier.fillMaxWidth().height(4.dp),
-                    color = Emerald500,
-                    trackColor = Slate800,
-                )
+        Column {
+            LinearProgressIndicator(
+                progress = { if (totalEst > 0) totalReal.toFloat() / totalEst else 0f },
+                modifier = Modifier.fillMaxWidth().height(4.dp),
+                color = Emerald500,
+                trackColor = Slate800,
+            )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Total estimado", style = MaterialTheme.typography.labelSmall.copy(color = Slate500))
-                        Text("$8.450", style = MaterialTheme.typography.titleMedium.copy(color = White))
-                    }
-
-                    Text(
-                        "$11.250",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            color = Emerald500,
-                            fontWeight = FontWeight.Black
-                        )
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Total estimado", style = MaterialTheme.typography.labelSmall.copy(color = Slate500))
+                    Text(formatPrice(totalEst), style = MaterialTheme.typography.titleMedium.copy(color = White))
                 }
+
+                Text(
+                    formatPrice(totalReal),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        color = Emerald500,
+                        fontWeight = FontWeight.Black
+                    )
+                )
             }
         }
     }

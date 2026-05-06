@@ -20,12 +20,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.*
+import com.example.misuper.ui.screens.familia.FamilyMembersScreen
 import com.example.misuper.ui.screens.inicio.HomeScreen
 import com.example.misuper.ui.screens.lista.ListaScreen
-import com.example.misuper.ui.screens.mapa.MapScreen
+import com.example.misuper.ui.screens.notifications.NotificationsScreen
+import com.example.misuper.ui.screens.ofertas.OfertasScreen
 import com.example.misuper.ui.screens.profile.ProfileScreen
 import com.example.misuper.ui.screens.tickets.TicketsScreen
 import com.example.misuper.ui.theme.*
+
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.misuper.viewmodel.AppViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,9 +44,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+
+    // 🔥 ACÁ se crea UNA sola vez
+    val viewModel: AppViewModel = viewModel()
 
     Scaffold(
         bottomBar = {
@@ -53,11 +62,21 @@ fun MainScreen() {
             startDestination = "INICIO",
             modifier = Modifier.padding(padding)
         ) {
-            composable("INICIO") { HomeScreen() }
-            composable("LISTA") { ListaScreen() }
-            composable("TICKETS") { TicketsScreen() }
-            composable("MAPA") { MapScreen() }
-            composable("PERFIL") { ProfileScreen() }
+            composable("INICIO") { 
+                HomeScreen(
+                    viewModel = viewModel,
+                    onNavigateToNotifications = { navController.navigate("NOTIFICACIONES") },
+                    onNavigateToFamily = { navController.navigate("FAMILIA") }
+                ) 
+            }
+            composable("LISTA") { ListaScreen(viewModel) }
+            composable("TICKETS") { TicketsScreen(viewModel) }
+            composable("OFERTAS") { OfertasScreen(viewModel) }
+            composable("PERFIL") { ProfileScreen(viewModel) }
+
+            // Sub-pantallas
+            composable("NOTIFICACIONES") { NotificationsScreen(viewModel) }
+            composable("FAMILIA") { FamilyMembersScreen(viewModel, onBack = { navController.popBackStack() }) }
         }
     }
 }
@@ -80,7 +99,7 @@ fun BottomBar(navController: NavController) {
                 Triple("INICIO", Icons.Filled.Home, "INICIO"),
                 Triple("LISTA", Icons.Filled.ShoppingCart, "LISTA"),
                 Triple("TICKETS", Icons.Filled.RequestPage, "TICKETS"),
-                Triple("MAPA", Icons.Filled.LocationOn, "MAPA"),
+                Triple("OFERTAS", Icons.Filled.LocalOffer, "OFERTAS"),
                 Triple("PERFIL", Icons.Filled.Person, "PERFIL")
             )
 

@@ -1,16 +1,16 @@
 package com.example.misuper.ui.screens.profile
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,404 +19,307 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.misuper.data.model.RolUsuario
+import com.example.misuper.data.model.Usuario
 import com.example.misuper.ui.theme.*
+import com.example.misuper.viewmodel.AppViewModel
+import java.util.Locale
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(viewModel: AppViewModel) {
     var visible by remember { mutableStateOf(false) }
+    var showEditProfile by remember { mutableStateOf(false) }
+    
     LaunchedEffect(Unit) { visible = true }
+
+    val members = viewModel.usuarios
+    val presupuestos = viewModel.presupuestos
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Slate950)
     ) {
-        // Background Orbs for depth
+        // Background Orbs
         Box(
             modifier = Modifier
                 .size(400.dp)
                 .offset(y = (-200).dp)
                 .align(Alignment.TopCenter)
                 .blur(100.dp)
-                .drawBehind {
-                    drawCircle(Emerald500.copy(alpha = 0.05f))
-                }
+                .drawBehind { drawCircle(Emerald500.copy(alpha = 0.05f)) }
         )
+
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = { ProfileHeader() }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(32.dp),
+                contentPadding = PaddingValues(top = 24.dp, bottom = 100.dp)
+            ) {
+                // User Info Card
+                item {
+                    ProfileInfoCard(
+                        name = "Santiago",
+                        email = "santiago@misuper.com",
+                        onEdit = { showEditProfile = true }
+                    )
+                }
+
+                // Family Budget Stats
+                item {
+                    SectionHeader("ESTADÍSTICAS DE PRESUPUESTO")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        presupuestos.forEach { p ->
+                            BudgetStatCard(
+                                title = p.nombre,
+                                total = p.montoTotal,
+                                available = p.montoDisponible,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+
+                // Family Members
+                item {
+                    SectionHeader("MIEMBROS DE LA FAMILIA (${members.size})")
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        members.forEach { member ->
+                            MemberRow(member)
+                        }
+                    }
+                }
+
+                // Settings
+                item {
+                    SectionHeader("AJUSTES")
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Slate900)
+                            .border(1.dp, Slate800, RoundedCornerShape(24.dp))
+                    ) {
+                        SettingsItem(Icons.Default.Notifications, "Notificaciones", "Configura tus alertas")
+                        SettingsItem(Icons.Default.Security, "Privacidad", "Maneja tus datos")
+                        SettingsItem(Icons.Default.Help, "Ayuda y Soporte", "Centro de asistencia")
+                        SettingsItem(Icons.Default.Logout, "Cerrar Sesión", "Salir de la cuenta", isDestructive = true)
+                    }
+                }
+            }
+        }
+        
+        if (showEditProfile) {
+            EditProfileModal(onClose = { showEditProfile = false })
+        }
+    }
+}
+
+fun formatPrice(amount: Int): String {
+    val formatter = java.text.DecimalFormat("$#,###.###", java.text.DecimalFormatSymbols(Locale("es", "AR")))
+    return formatter.format(amount).replace(",", ".")
+}
+
+@Composable
+fun ProfileHeader() {
+    Row(
+        modifier = Modifier
+            .statusBarsPadding()
+            .fillMaxWidth()
+            .padding(24.dp),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Text(
+            "MI PERFIL",
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = Slate100,
+                fontWeight = FontWeight.Black,
+                fontSize = 12.sp,
+                letterSpacing = 2.4.sp
+            )
+        )
+    }
+}
+
+@Composable
+fun ProfileInfoCard(name: String, email: String, onEdit: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(32.dp),
+        colors = CardDefaults.cardColors(containerColor = Slate900),
+        border = BorderStroke(1.dp, Slate800)
+    ) {
+        Row(
+            modifier = Modifier.padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .background(Emerald600, CircleShape)
+                    .border(4.dp, Slate950, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    name.take(1).uppercase(),
+                    color = White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(20.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(name, color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(email, color = Slate500, fontSize = 14.sp)
+            }
+            
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, null, tint = Emerald500)
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String) {
+    Text(
+        title,
+        modifier = Modifier.padding(bottom = 16.dp),
+        style = MaterialTheme.typography.labelSmall.copy(
+            color = Slate500,
+            fontWeight = FontWeight.Black,
+            fontSize = 10.sp,
+            letterSpacing = 1.5.sp
+        )
+    )
+}
+
+@Composable
+fun BudgetStatCard(title: String, total: Int, available: Int, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Slate900),
+        border = BorderStroke(1.dp, Slate800)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title.uppercase(), color = Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(formatPrice(total), color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("Disponible", color = Emerald500, fontSize = 11.sp)
+            Text(formatPrice(available), color = Emerald500, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+fun MemberRow(member: Usuario) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Slate900)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(
             modifier = Modifier
-                .size(400.dp)
-                .offset(y = 200.dp)
-                .align(Alignment.BottomCenter)
-                .blur(100.dp)
-                .drawBehind {
-                    drawCircle(Blue500.copy(alpha = 0.05f))
-                }
-        )
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            contentPadding = PaddingValues(top = 64.dp, bottom = 100.dp)
+                .size(40.dp)
+                .background(Slate800, CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            item {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn() + expandVertically()
-                ) {
-                    UserInfoSection()
-                }
-            }
-
-            item {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = tween(delayMillis = 100)) + slideInVertically(initialOffsetY = { 50 })
-                ) {
-                    StatsBentoBox()
-                }
-            }
-
-            item {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = tween(delayMillis = 200)) + slideInVertically(initialOffsetY = { 50 })
-                ) {
-                    SettingsList()
-                }
-            }
-
-            item {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = tween(delayMillis = 300)) + slideInVertically(initialOffsetY = { 50 })
-                ) {
-                    LogoutButton()
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                FooterSection()
-            }
+            Text(member.nombre.take(1).uppercase(), color = White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(member.nombre, color = White, fontWeight = FontWeight.Bold)
+            Text(member.rol.name, color = Slate500, fontSize = 12.sp)
+        }
+        if (member.rol == RolUsuario.ADMIN) {
+            Icon(Icons.Default.Stars, null, tint = Amber500, modifier = Modifier.size(20.dp))
         }
     }
 }
 
 @Composable
-fun UserInfoSection() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(contentAlignment = Alignment.Center) {
-            // Avatar Circle
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            listOf(Emerald600, Color(0xFF064E3B))
-                        )
-                    )
-                    .border(2.dp, Slate800, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = Color.White
-                )
-            }
-
-            // Online Indicator with pulse
-            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-            val alpha by infiniteTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = 0.4f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "alpha"
-            )
-
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .align(Alignment.BottomEnd)
-                    .padding(2.dp)
-                    .background(Slate950, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .background(Emerald500.copy(alpha = alpha), CircleShape)
-                        .border(1.dp, Emerald500, CircleShape)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Santiago Sanches",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
-            )
-        )
-        Text(
-            text = "PLAN PREMIUM FAMILIAR",
-            style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate500,
-                fontSize = 10.sp,
-                letterSpacing = 2.4.sp,
-                fontWeight = FontWeight.Bold
-            )
-        )
-    }
-}
-
-@Composable
-fun StatsBentoBox() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
-        color = Slate900,
-        border = BorderStroke(1.dp, Slate800)
+fun SettingsItem(icon: ImageVector, title: String, subtitle: String, isDestructive: Boolean = false) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { }
+            .padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .padding(24.dp)
-                .height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("TOTAL AHORRADO", style = MaterialTheme.typography.labelSmall.copy(color = Slate500, fontSize = 10.sp))
-                Text(
-                    "€1,240.50",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        color = Emerald500,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-
-            VerticalDivider(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(horizontal = 8.dp),
-                thickness = 1.dp,
-                color = Slate800.copy(alpha = 0.3f)
-            )
-
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("SUPER PUNTOS", style = MaterialTheme.typography.labelSmall.copy(color = Slate500, fontSize = 10.sp))
-                Text(
-                    "2,840 pts",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        color = Blue500,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsList() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
-        color = Slate900,
-        border = BorderStroke(1.dp, Slate800)
-    ) {
+        Icon(icon, null, tint = if (isDestructive) Rose500 else Slate400, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
         Column {
-            SettingsItem(
-                icon = Icons.Default.Notifications,
-                iconColor = Blue500,
-                title = "Notificaciones",
-                subtitle = "Control de alertas",
-                isLast = false
-            )
-            SettingsItem(
-                icon = Icons.Default.Group,
-                iconColor = Emerald500,
-                title = "Miembros del Grupo",
-                subtitle = "Gestión familiar",
-                isLast = false
-            )
-            SettingsItem(
-                icon = Icons.Default.Security,
-                iconColor = Amber500,
-                title = "Seguridad y Privacidad",
-                subtitle = "Contraseña",
-                isLast = false
-            )
-            SettingsItem(
-                icon = Icons.Default.CreditCard,
-                iconColor = Indigo600,
-                title = "Métodos de Pago",
-                subtitle = "Tarjetas vinculadas",
-                isLast = false
-            )
-            SettingsItem(
-                icon = Icons.AutoMirrored.Filled.Help,
-                iconColor = Slate400,
-                title = "Ayuda y Soporte",
-                isLast = true
-            )
+            Text(title, color = if (isDestructive) Rose500 else White, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = Slate500, fontSize = 12.sp)
         }
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, null, tint = Slate700)
     }
 }
 
 @Composable
-fun SettingsItem(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    subtitle: String? = null,
-    isLast: Boolean
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.95f else 1f, label = "scale")
-
-    Column(
+fun EditProfileModal(onClose: () -> Unit) {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .scale(scale)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) { /* Logic */ }
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.Center
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.8f))
+            .clickable { onClose() },
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .clickable(enabled = false) { },
+            shape = RoundedCornerShape(32.dp),
+            colors = CardDefaults.cardColors(containerColor = Slate900)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Slate950, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, null, tint = iconColor, modifier = Modifier.size(20.dp))
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        color = Slate100,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
+            Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Editar Perfil", color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                OutlinedTextField(
+                    value = "Santiago",
+                    onValueChange = {},
+                    label = { Text("Nombre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = White,
+                        unfocusedTextColor = White,
+                        focusedBorderColor = Emerald500
                     )
                 )
-                if (subtitle != null) {
-                    Text(
-                        subtitle,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Slate500,
-                            fontSize = 12.sp
-                        )
-                    )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = onClose,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+                ) {
+                    Text("GUARDAR CAMBIOS")
                 }
             }
-
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = Slate700,
-                modifier = Modifier.size(16.dp)
-            )
         }
-
-        if (!isLast) {
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 16.dp),
-                thickness = 1.dp,
-                color = Slate800.copy(alpha = 0.5f)
-            )
-        }
-    }
-}
-
-@Composable
-fun LogoutButton() {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.95f else 1f, label = "scale")
-    val bgColor = if (isPressed) Rose500.copy(alpha = 0.1f) else Slate900
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .scale(scale)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) { /* Logic */ },
-        shape = RoundedCornerShape(40.dp),
-        color = bgColor,
-        border = BorderStroke(1.dp, Slate800)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                "CERRAR SESIÓN ACTUAL",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    color = Rose500,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 2.1.sp
-                )
-            )
-        }
-    }
-}
-
-@Composable
-fun FooterSection() {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            "SUPER AHORRO V1.0.4",
-            style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate700,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 3.2.sp
-            )
-        )
-        Text(
-            "© 2024 - MATERIA: PROGRAMACIÓN MÓVIL",
-            style = MaterialTheme.typography.labelSmall.copy(
-                color = Slate700,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 3.2.sp
-            )
-        )
     }
 }
