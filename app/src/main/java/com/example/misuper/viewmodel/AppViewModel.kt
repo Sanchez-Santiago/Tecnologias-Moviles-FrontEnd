@@ -64,6 +64,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // LISTAS
     // ----------------------
 
+    fun agregarLista(lista: ListaCompra) {
+        viewModelScope.launch {
+            repository.agregarLista(lista)
+            refrescar()
+        }
+    }
+
     fun agregarProducto(listaId: String, producto: Producto) {
         viewModelScope.launch {
             repository.agregarOActualizarProducto(listaId, producto)

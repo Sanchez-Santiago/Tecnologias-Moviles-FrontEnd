@@ -95,6 +95,15 @@ Desarrollar una aplicación funcional en Android que gestione compras de superme
 - [ ] Menús y diálogos interactivos
 - [ ] Carga real de datos desde Room
 
+### Correcciones Pendientes (Detectadas):
+- [x] **CRÍTICO**: Agregar método `agregarProducto` en AppViewModel (causaba crash al crear producto) - **SOLUCIONADO**
+- [x] Mejorar diseño de SplashScreen (agregar logo, animaciones, indicador de carga, gradiente de fondo) - **MEJORADO**
+- [ ] Validación real en Login/Registro (actualmente solo interfaz visual)
+- [ ] Corregir navegación post-login para validar credenciales
+- [ ] Revisar diseño de LoginScreen (mejorar interfaz visual)
+- [ ] Agregar campo `código` y `descripción` en formulario de NewProductScreen
+- [ ] Verificar que todos los campos del Producto se guarden correctamente
+
 ### Extras/Opcionales (Etapa Final):
 - [ ] Carga automática del ticket con IA/OCR
 - [ ] Chat para consultas sobre historial

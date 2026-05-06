@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.misuper.data.model.Categoria
+import com.example.misuper.data.model.ListaCompra
 import com.example.misuper.data.model.Producto
 import com.example.misuper.ui.theme.*
 import com.example.misuper.viewmodel.AppViewModel
@@ -182,31 +183,41 @@ fun NewProductScreen(viewModel: AppViewModel, itemToEdit: Producto? = null, onCl
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = { 
-                    if (validateForm()) {
-                        val cleanPrice = price.filter { it.isDigit() }.toIntOrNull() ?: 0
-                        
-                        val newProduct = Producto(
-                            id = itemToEdit?.id ?: UUID.randomUUID().toString(),
-                            nombre = name,
-                            marca = brand,
-                            precioEstimado = cleanPrice,
-                            precioReal = itemToEdit?.precioReal,
-                            cantidad = quantity,
-                            comprado = itemToEdit?.comprado ?: false,
-                            categoria = selectedCategory
-                        )
-                        
-                        // Determinar en qué lista guardarlo basándose en el presupuesto activo
-                        val presupuestoActivo = viewModel.presupuestos.find { it.activo }
-                        val listaId = if (presupuestoActivo?.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
-                        
-                        println("Intentando guardar producto: $newProduct en lista: $listaId")
-                        viewModel.agregarProducto(listaId, newProduct)
-                        onClose()
-                    }
-                },
+                Button(
+                    onClick = { 
+                        if (validateForm()) {
+                            val cleanPrice = price.filter { it.isDigit() }.toIntOrNull() ?: 0
+                            
+                            val newProduct = Producto(
+                                id = itemToEdit?.id ?: UUID.randomUUID().toString(),
+                                codigo = itemToEdit?.codigo ?: "",
+                                nombre = name,
+                                descripcion = itemToEdit?.descripcion ?: "",
+                                precio = cleanPrice,
+                                marca = brand,
+                                precioEstimado = cleanPrice,
+                                precioReal = itemToEdit?.precioReal,
+                                cantidad = quantity,
+                                comprado = itemToEdit?.comprado ?: false,
+                                categoria = selectedCategory
+                            )
+                            
+                            // Determinar en qué lista guardarlo basándose en el presupuesto activo
+                            val presupuestoActivo = viewModel.presupuestos.find { it.activo }
+                            val listaId = if (presupuestoActivo?.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
+                            
+                            // Verificar si la lista existe, si no, crearla
+                            val listaExiste = viewModel.listas.any { it.id == listaId }
+                            if (!listaExiste) {
+                                println("La lista $listaId no existe, creándola...")
+                                viewModel.agregarLista(ListaCompra(id = listaId, nombre = if (listaId == "lista-familiar") "Lista Familiar" else "Lista Individual"))
+                            }
+                            
+                            println("Intentando guardar producto: $newProduct en lista: $listaId")
+                            viewModel.agregarProducto(listaId, newProduct)
+                            onClose()
+                        }
+                    },
                 enabled = isValid,
                 modifier = Modifier
                     .fillMaxWidth()
