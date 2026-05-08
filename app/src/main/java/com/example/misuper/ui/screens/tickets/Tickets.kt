@@ -1,8 +1,10 @@
 package com.example.misuper.ui.screens.tickets
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.misuper.data.model.MetodoPago
 import com.example.misuper.data.model.Ticket
 import com.example.misuper.data.model.TicketProducto
@@ -49,9 +53,9 @@ import java.util.*
 
 @Composable
 fun TicketsScreen(viewModel: AppViewModel) {
-    var showModal by remember { mutableStateOf(false) }
+    var showModal by rememberSaveable { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var ticketToEdit by remember { mutableStateOf<Ticket?>(null) }
+    var ticketToEdit by rememberSaveable { mutableStateOf<Ticket?>(null) }
     
     val presupuestoActivo = viewModel.presupuestos.find { it.activo }
     val tickets = viewModel.tickets.filter { it.presupuestoId == presupuestoActivo?.id }
@@ -462,11 +466,11 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
     val calendar = Calendar.getInstance()
     if (ticketToEdit != null) calendar.timeInMillis = ticketToEdit.fechaHora
     
-    var supermarket by remember { mutableStateOf(ticketToEdit?.supermercado ?: "") }
-    var dateMillis by remember { mutableLongStateOf(ticketToEdit?.fechaHora ?: System.currentTimeMillis()) }
-    var total by remember { mutableStateOf(ticketToEdit?.total?.toString() ?: "") }
-    var savedImagePath by remember { mutableStateOf<String?>(null) }
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var supermarket by rememberSaveable { mutableStateOf(ticketToEdit?.supermercado ?: "") }
+    var dateMillis by rememberSaveable { mutableLongStateOf(ticketToEdit?.fechaHora ?: System.currentTimeMillis()) }
+    var total by rememberSaveable { mutableStateOf(ticketToEdit?.total?.toString() ?: "") }
+    var savedImagePath by rememberSaveable { mutableStateOf(ticketToEdit?.imagenPath) }
+    var selectedUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     
     // Helper function to save bitmap to gallery (must be called from non-composable context)
     fun saveBitmapToGallery(bitmap: Bitmap, context: Context): String {
@@ -535,6 +539,14 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
             val path = saveBitmapToGallery(bitmap, context)
             savedImagePath = path
             selectedUri = null
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
         }
     }
 
@@ -644,7 +656,14 @@ fun RegisterPurchaseModal(viewModel: AppViewModel, ticketToEdit: Ticket? = null,
                             .weight(1f)
                             .height(64.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { cameraLauncher.launch(null) },
+                            .clickable { 
+                                val permissionCheckResult = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                                if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
+                                    cameraLauncher.launch(null)
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            },
                         shape = RoundedCornerShape(16.dp),
                         color = if (savedImagePath != null) Emerald600.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
                         border = BorderStroke(1.dp, if (savedImagePath != null) Emerald500 else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
