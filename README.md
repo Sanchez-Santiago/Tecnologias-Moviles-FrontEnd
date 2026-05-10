@@ -1,3 +1,7 @@
+#enlace de la ppt del proyecto frontend https://gamma.app/docs/Super-Ahorro--bk299mnb4fxe9ey 
+
+#EN ESTA PRESENTACION SE ENCUENTRA EL ENLACE A UN VIDEO DEMOSTRATIVO DE LA INTERACCION Y VISUALIZACUON DEL EL FRONTEND DE LA APLICACION 
+
 # Super Ahorro 🛒
 
 Aplicación móvil desarrollada para la materia **Tecnologías Móviles (2026)**. El objetivo principal es permitir a los usuarios registrar, consultar y analizar sus gastos de supermercado para llevar un mejor control financiero y detectar oportunidades de ahorro.
@@ -123,7 +127,7 @@ export JAVA_HOME=/opt/android-studio/jbr
 (Próximamente)
 
 ## 👨‍💻 Desarrollado por
-**Santiago S.** - 2026  
+Santiago S. y Giuliano Pucci - 2026  
 Tecnologías Móviles - Universidad
 
 ---
