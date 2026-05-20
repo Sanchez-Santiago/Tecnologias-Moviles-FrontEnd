@@ -26,4 +26,30 @@
     <string name="hora_hint">Hora</string>
     <string name="supermercado_hint">Supermercado</string>
     <string name="total_hint">Total</string>
+    <string name="products_title">Productos</string>
+    <string name="product_item">Producto %1$d</string>
+    <string name="product_code">Código: %1$s</string>
+    <string name="product_description">Descripción del producto</string>
+    <string name="save_purchase_button">Guardar Compra</string>
+    <string name="back_button">Volver</string>
+    <string name="date_label">Fecha:</string>
+    <string name="time_label">Hora:</string>
+    <string name="supermarket_label">Supermercado:</string>
+    <string name="total_label">Total:</string>
+    <string name="appearance_title">Apariencia</string>
+    <string name="dark_theme_option">Tema Oscuro</string>
+    <string name="notifications_title">Notificaciones</string>
+    <string name="enable_notifications_option">Activar notificaciones</string>
+    <string name="auto_sync_option">Sincronización automática</string>
+    <string name="account_title">Cuenta</string>
+    <string name="logout_button">Cerrar Sesión</string>
+    <string name="app_version_label">Super Ahorro v1.0 - Primera Entrega</string>
+    <string name="total_spending_may_2026">Gasto Total - Mayo 2026</string>
+    <string name="previous_month_comparison" formatted="false">↑ 12% vs mes anterior</string>
+    <string name="spending_by_supermarket_title">Gasto por Supermercado</string>
+    <string name="monthly_evolution_title">Evolución Mensual</string>
+    <string name="most_purchased_products_title">Productos más comprados</string>
+    <string name="budget_details_title">Detalles del Presupuesto</string>
+    <string name="spent_label">Gastado:</string>
+    <string name="total_estimated_label">Total estimado</string>
 </resources>

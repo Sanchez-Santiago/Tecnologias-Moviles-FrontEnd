@@ -1,10 +1,11 @@
 plugins {
     alias(libs.plugins.android.application)
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.kapt")
     alias(libs.plugins.kotlin.compose)
 }
 android {
-    namespace = "com.example.misuper"
+    namespace = "com.undef.superahorrosanchezpucci"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.misuper"
+        applicationId = "com.undef.superahorrosanchezpucci"
         minSdk = 28
         targetSdk = 36
         versionCode = 1
@@ -44,7 +45,6 @@ android {
 }
 
 dependencies {
-    implementation("com.google.code.gson:gson:2.10.1")
     implementation(platform("androidx.compose:compose-bom:2024.12.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
@@ -58,8 +58,12 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.navigation.runtime.ktx)
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
