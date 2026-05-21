@@ -1,5 +1,9 @@
 package com.undef.superahorrosanchezpucci.data.model
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
 data class Producto(
     val id: String,
     val codigo: String = "",
@@ -12,9 +16,10 @@ data class Producto(
     val cantidad: Int = 1,
     val comprado: Boolean = false,
     val categoria: Categoria = Categoria.ESENCIAL
-)
+) : Parcelable
 
-enum class Categoria {
+@Parcelize
+enum class Categoria : Parcelable {
     ESENCIAL,
     PRINCIPAL,
     SECUNDARIO

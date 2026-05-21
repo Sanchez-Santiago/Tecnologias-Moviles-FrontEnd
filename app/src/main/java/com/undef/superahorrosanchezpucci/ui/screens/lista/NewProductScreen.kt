@@ -1,5 +1,9 @@
 package com.undef.superahorrosanchezpucci.ui.screens.lista
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,12 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.undef.superahorrosanchezpucci.data.model.Categoria
 import com.undef.superahorrosanchezpucci.data.model.ListaCompra
@@ -33,6 +39,7 @@ import java.util.*
 
 @Composable
 fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, onClose: () -> Unit) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf(itemToEdit?.nombre ?: "") }
     var code by remember { mutableStateOf(itemToEdit?.codigo ?: "") }
     var brand by remember { mutableStateOf(itemToEdit?.marca ?: "") }
@@ -44,6 +51,24 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
     
     var nameError by remember { mutableStateOf<String?>(null) }
     var priceError by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        // Aquí se procesaría el código de barras si hubiera una librería
+        // Por ahora simulamos que detectó un código
+        if (bitmap != null) {
+            code = "779${(10000000..99999999).random()}"
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
+        }
+    }
 
     val isEditing = itemToEdit != null
     
@@ -134,7 +159,15 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
                         value = code,
                         onValueChange = { code = it },
                         placeholder = "Ej: 7791234567890",
-                        leadingIcon = Icons.Default.QrCodeScanner
+                        leadingIcon = Icons.Default.QrCodeScanner,
+                        onIconClick = { 
+                            val permissionCheckResult = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                            if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
+                                cameraLauncher.launch(null)
+                            } else {
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        }
                     )
                 }
 
@@ -287,10 +320,10 @@ fun CustomTextField(
     leadingIcon: ImageVector? = null,
     height: Dp = 56.dp,
     keyboardType: KeyboardType = KeyboardType.Text,
-    error: String? = null
+    error: String? = null,
+    onIconClick: (() -> Unit)? = null
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextField(
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { TextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
@@ -305,7 +338,16 @@ fun CustomTextField(
                 ),
             placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) },
             leadingIcon = if (leadingIcon != null) {
-                { Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                { 
+                    Icon(
+                        leadingIcon, 
+                        contentDescription = null, 
+                        modifier = Modifier
+                            .size(18.dp)
+                            .then(if (onIconClick != null) Modifier.clickable { onIconClick() } else Modifier), 
+                        tint = if (onIconClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    ) 
+                }
             } else null,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,

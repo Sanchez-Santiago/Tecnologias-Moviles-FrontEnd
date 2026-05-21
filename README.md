@@ -2,6 +2,8 @@
 
 Aplicacion Android desarrollada para la materia Tecnologias Moviles 2026.
 
+Presentacion del proyecto: https://gamma.app/docs/Super-Ahorro--bk299mnb4fxe9ey
+
 La app esta pensada para registrar compras de supermercado, organizar listas de productos, controlar presupuestos y consultar informacion util sobre los gastos realizados.
 
 ## Funcionalidades

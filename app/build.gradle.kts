@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-parcelize")
 }
 android {
     namespace = "com.undef.superahorrosanchezpucci"

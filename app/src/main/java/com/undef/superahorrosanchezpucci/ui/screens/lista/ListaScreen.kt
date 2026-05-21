@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +41,7 @@ import com.undef.superahorrosanchezpucci.viewmodel.ListaViewModel
 fun ListaScreen(viewModel: ListaViewModel) {
     var selectedFilter by remember { mutableStateOf("TODOS") }
     var searchQuery by remember { mutableStateOf("") }
-    var showAddItemModal by remember { mutableStateOf(false) }
+    var showAddItemModal by rememberSaveable { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<Producto?>(null) }
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
     val listas by viewModel.listas.collectAsStateWithLifecycle()
