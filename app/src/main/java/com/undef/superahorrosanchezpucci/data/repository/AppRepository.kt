@@ -1,15 +1,14 @@
 package com.undef.superahorrosanchezpucci.data.repository
 
-import com.undef.superahorrosanchezpucci.data.local.AppDao
-import com.undef.superahorrosanchezpucci.data.local.toEntity
-import com.undef.superahorrosanchezpucci.data.local.toModel
-import com.undef.superahorrosanchezpucci.data.local.toThemeMode
 import com.undef.superahorrosanchezpucci.data.model.*
+import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
+import com.undef.superahorrosanchezpucci.data.remote.RemoteAppApi
 import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class AppRepository(private val dao: AppDao) {
+class AppRepository {
+    private val remoteApi = RemoteAppApi()
 
     var presupuestos = mutableListOf<Presupuesto>()
         private set
@@ -31,29 +30,16 @@ class AppRepository(private val dao: AppDao) {
     // ----------------------
 
     suspend fun cargarTodo() = withContext(Dispatchers.IO) {
-        val presupuestosRoom = dao.getPresupuestos()
-
-        if (presupuestosRoom.isNotEmpty()) {
-            val productosPorLista = dao.getProductos()
-                .groupBy { it.listaId }
-                .mapValues { entry -> entry.value.map { it.toModel() } }
-
-            val ticketProductosPorTicket = dao.getTicketProductos()
-                .groupBy { it.ticketId }
-                .mapValues { entry -> entry.value.map { it.toModel() } }
-
-            presupuestos = presupuestosRoom.map { it.toModel() }.toMutableList()
-            listas = dao.getListas()
-                .map { lista -> lista.toModel(productosPorLista[lista.id].orEmpty()) }
-                .toMutableList()
-            tickets = dao.getTickets()
-                .map { ticket -> ticket.toModel(ticketProductosPorTicket[ticket.id].orEmpty()) }
-                .toMutableList()
-            usuarios = dao.getUsuarios().map { it.toModel() }.toMutableList()
-            themeMode = dao.getConfig()?.toThemeMode() ?: ThemeMode.SYSTEM
-        } else {
-            inicializarDatos()
+        if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            val remoteState = remoteApi.loadState()
+            presupuestos = remoteState.presupuestos.toMutableList()
+            listas = remoteState.listas.toMutableList()
+            tickets = remoteState.tickets.toMutableList()
+            usuarios = remoteState.usuarios.toMutableList()
+            return@withContext
         }
+
+        inicializarDatos()
     }
 
     private suspend fun inicializarDatos() {
@@ -115,21 +101,8 @@ class AppRepository(private val dao: AppDao) {
     // ----------------------
 
     suspend fun guardarTodo() = withContext(Dispatchers.IO) {
-        dao.replaceAll(
-            presupuestos = presupuestos.map { it.toEntity() },
-            listas = listas.map { it.toEntity() },
-            productos = listas.flatMap { lista ->
-                lista.productos.map { producto -> producto.toEntity(lista.id) }
-            },
-            tickets = tickets.map { it.toEntity() },
-            ticketProductos = tickets.flatMap { ticket ->
-                ticket.productos.mapIndexed { index, producto ->
-                    producto.toEntity(ticket.id, index)
-                }
-            },
-            usuarios = usuarios.map { it.toEntity() },
-            config = themeMode.toEntity()
-        )
+        // El estado principal se sincroniza con Render. Esta función queda como
+        // compatibilidad para las pantallas que actualizan estado en memoria.
     }
 
     // ----------------------
@@ -156,6 +129,15 @@ class AppRepository(private val dao: AppDao) {
     }
 
     suspend fun actualizarPresupuesto(id: String, nuevoMonto: Int) {
+        if (!AuthSessionStore.accessToken.isNullOrBlank() && id != "presupuesto-familiar" && id != "presupuesto-individual") {
+            val actualizado = remoteApi.updateBudget(id, nuevoMonto)
+            val index = presupuestos.indexOfFirst { it.id == id }
+            if (index != -1) {
+                presupuestos[index] = actualizado
+            }
+            return
+        }
+
         val index = presupuestos.indexOfFirst { it.id == id }
         if (index != -1) {
             val actual = presupuestos[index]
@@ -178,16 +160,22 @@ class AppRepository(private val dao: AppDao) {
     }
 
     suspend fun agregarOActualizarProducto(listaId: String, producto: Producto) {
+        val productoRemoto = if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            runCatching { remoteApi.createOrUpdateProduct(producto) }.getOrElse { producto }
+        } else {
+            producto
+        }
+
         val indexLista = listas.indexOfFirst { it.id == listaId }
         if (indexLista != -1) {
             val lista = listas[indexLista]
             val nuevosProductos = lista.productos.toMutableList()
             
-            val indexProd = nuevosProductos.indexOfFirst { it.id == producto.id }
+            val indexProd = nuevosProductos.indexOfFirst { it.id == producto.id || it.id == productoRemoto.id }
             if (indexProd != -1) {
-                nuevosProductos[indexProd] = producto
+                nuevosProductos[indexProd] = productoRemoto
             } else {
-                nuevosProductos.add(producto)
+                nuevosProductos.add(productoRemoto)
             }
             
             listas[indexLista] = lista.copy(productos = nuevosProductos)
@@ -196,6 +184,10 @@ class AppRepository(private val dao: AppDao) {
     }
 
     suspend fun eliminarProducto(listaId: String, productoId: String) {
+        if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            runCatching { remoteApi.deleteProduct(productoId) }
+        }
+
         val indexLista = listas.indexOfFirst { it.id == listaId }
         if (indexLista != -1) {
             val lista = listas[indexLista]
@@ -238,6 +230,12 @@ class AppRepository(private val dao: AppDao) {
     // ----------------------
 
     suspend fun agregarTicket(ticket: Ticket) {
+        if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            val remoteTicket = remoteApi.addPurchase(ticket)
+            tickets.add(remoteTicket)
+            return
+        }
+
         val presupuestoActivo = presupuestos.find { it.activo }
         val ticketVinculado = if (presupuestoActivo != null) {
             ticket.copy(presupuestoId = presupuestoActivo.id)

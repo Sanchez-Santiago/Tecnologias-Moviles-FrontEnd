@@ -1,13 +1,13 @@
 package com.undef.superahorrosanchezpucci.viewmodel
 
 import android.app.Application
-import com.undef.superahorrosanchezpucci.data.local.AppDatabase
 import com.undef.superahorrosanchezpucci.data.model.Categoria
 import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Producto
 import com.undef.superahorrosanchezpucci.data.model.Ticket
 import com.undef.superahorrosanchezpucci.data.model.Usuario
+import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.data.repository.AppRepository
 import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
@@ -21,9 +21,7 @@ import kotlinx.coroutines.launch
 class AppStateStore private constructor(application: Application) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val repository = AppRepository(
-        AppDatabase.get(application.applicationContext).appDao()
-    )
+    private val repository = AppRepository()
 
     private val _presupuestos = MutableStateFlow<List<Presupuesto>>(emptyList())
     val presupuestos: StateFlow<List<Presupuesto>> = _presupuestos.asStateFlow()
@@ -44,9 +42,14 @@ class AppStateStore private constructor(application: Application) {
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
+        AuthSessionStore.initialize(application.applicationContext)
+        reload()
+    }
+
+    fun reload() {
         scope.launch {
             _isLoading.value = true
-            repository.cargarTodo()
+            runCatching { repository.cargarTodo() }
             refrescar()
             _themeMode.value = repository.themeMode
             _isLoading.value = false

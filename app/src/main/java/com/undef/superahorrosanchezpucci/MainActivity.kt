@@ -40,6 +40,7 @@ import com.undef.superahorrosanchezpucci.ui.theme.*
 
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.viewmodel.FamilyViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.HomeViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ListaViewModel
@@ -50,6 +51,7 @@ import com.undef.superahorrosanchezpucci.viewmodel.TicketsViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AuthSessionStore.initialize(applicationContext)
         enableEdgeToEdge()
         setContent {
             val themeViewModel: ThemeViewModel = viewModel()
