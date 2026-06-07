@@ -1,5 +1,6 @@
 package com.undef.superahorrosanchezpucci.ui.screens.auth
 
+import android.util.Patterns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -16,7 +17,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.undef.superahorrosanchezpucci.R
 import com.undef.superahorrosanchezpucci.data.remote.AuthApi
-import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
 import com.undef.superahorrosanchezpucci.viewmodel.AppStateStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,11 +31,23 @@ fun LoginScreen(navController: NavController) {
     val context = LocalContext.current
     val authApi = remember { AuthApi(context.applicationContext) }
     val scope = rememberCoroutineScope()
+    val colorScheme = MaterialTheme.colorScheme
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = colorScheme.onSurface,
+        unfocusedTextColor = colorScheme.onSurface,
+        focusedLabelColor = colorScheme.primary,
+        unfocusedLabelColor = colorScheme.onSurfaceVariant,
+        cursorColor = colorScheme.primary,
+        focusedBorderColor = colorScheme.primary,
+        unfocusedBorderColor = colorScheme.outline,
+        focusedContainerColor = colorScheme.surface,
+        unfocusedContainerColor = colorScheme.surface
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(colorScheme.background)
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -44,7 +56,7 @@ fun LoginScreen(navController: NavController) {
             text = stringResource(R.string.splash_title),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Emerald700
+            color = colorScheme.primary
         )
 
         Spacer(modifier = Modifier.height(48.dp))
@@ -52,7 +64,8 @@ fun LoginScreen(navController: NavController) {
         Text(
             text = stringResource(R.string.login_title),
             fontSize = 24.sp,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            color = colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -61,7 +74,8 @@ fun LoginScreen(navController: NavController) {
             value = email,
             onValueChange = { email = it },
             label = { Text(stringResource(R.string.email_hint)) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = fieldColors
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -71,7 +85,8 @@ fun LoginScreen(navController: NavController) {
             onValueChange = { password = it },
             label = { Text(stringResource(R.string.password_hint)) },
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = PasswordVisualTransformation(),
+            colors = fieldColors
         )
 
         errorMessage?.let { message ->
@@ -87,6 +102,11 @@ fun LoginScreen(navController: NavController) {
 
                 if (email.isBlank() || password.isBlank()) {
                     errorMessage = "Completá email y contraseña."
+                    return@Button
+                }
+
+                if (!Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+                    errorMessage = "Ingresá un email válido."
                     return@Button
                 }
 
@@ -113,7 +133,12 @@ fun LoginScreen(navController: NavController) {
             },
             enabled = !isLoading,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colorScheme.primary,
+                contentColor = colorScheme.onPrimary,
+                disabledContainerColor = colorScheme.surfaceVariant,
+                disabledContentColor = colorScheme.onSurfaceVariant
+            )
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -122,7 +147,11 @@ fun LoginScreen(navController: NavController) {
                     strokeWidth = 2.dp
                 )
             } else {
-                Text(stringResource(R.string.login_button), modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    stringResource(R.string.login_button),
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = colorScheme.onPrimary
+                )
             }
         }
 
@@ -131,7 +160,7 @@ fun LoginScreen(navController: NavController) {
         TextButton(
             onClick = { navController.navigate("REGISTER") }
         ) {
-            Text(stringResource(R.string.no_account), color = Emerald700)
+            Text(stringResource(R.string.no_account), color = colorScheme.primary)
         }
     }
 }

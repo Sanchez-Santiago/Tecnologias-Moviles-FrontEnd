@@ -108,7 +108,12 @@ fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = { navController.navigate("LOGIN") },
+                    onClick = {
+                        viewModel.cerrarSesion()
+                        navController.navigate("LOGIN") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {

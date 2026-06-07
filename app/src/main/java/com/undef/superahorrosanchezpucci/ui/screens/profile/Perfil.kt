@@ -44,6 +44,7 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val members by viewModel.usuarios.collectAsStateWithLifecycle()
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
+    val currentUser = members.firstOrNull { it.rol == RolUsuario.ADMIN } ?: members.firstOrNull()
     
     val isDark = when (themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -84,8 +85,8 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
                 // User Info Card
                 item {
                     ProfileInfoCard(
-                        name = "Santiago",
-                        email = "santiago@misuper.com",
+                        name = currentUser?.nombre?.takeIf { it.isNotBlank() } ?: "Usuario",
+                        email = currentUser?.email?.takeIf { it.isNotBlank() } ?: "Sin email",
                         isDark = isDark,
                         onEdit = { showEditProfile = true }
                     )
@@ -196,7 +197,12 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
                             "Salir de la cuenta", 
                             isDestructive = true,
                             isDark = isDark,
-                            onClick = { }
+                            onClick = {
+                                viewModel.cerrarSesion()
+                                navController?.navigate("LOGIN") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
                         )
                     }
                 }

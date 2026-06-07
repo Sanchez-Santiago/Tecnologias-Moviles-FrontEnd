@@ -15,4 +15,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val presupuestos: StateFlow<List<Presupuesto>> = store.presupuestos
 
     fun updateThemeMode(mode: ThemeMode) = store.updateThemeMode(mode)
+
+    fun cerrarSesion() = store.cerrarSesion()
 }

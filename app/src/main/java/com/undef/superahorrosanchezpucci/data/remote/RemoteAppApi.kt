@@ -19,7 +19,6 @@ import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.net.URL
 import java.time.LocalDate
-import java.util.UUID
 import kotlin.math.roundToInt
 
 class RemoteAppApi {
@@ -36,24 +35,28 @@ class RemoteAppApi {
         }
 
         val budgets = getBudgets(group.id)
-        val products = getProducts()
         val purchases = getPurchases(group.id)
-
-        val activeBudget = budgets.firstOrNull()
-        val lista = ListaCompra(
-            id = "lista-familiar",
-            nombre = "Lista Familiar",
-            presupuestoId = activeBudget?.id ?: "",
-            esFamiliar = true,
-            productos = products.toMutableList()
-        )
 
         return RemoteAppState(
             presupuestos = budgets.ifEmpty { defaultBudgets() },
-            listas = listOf(lista),
+            listas = emptyList(),
             tickets = purchases,
             usuarios = users
         )
+    }
+
+    fun createBudget(name: String, amount: Int): Presupuesto {
+        val gid = groupId ?: ensureGroup().id.also { groupId = it }
+        val safeAmount = amount.toDouble().coerceAtLeast(1.0)
+        val body = JSONObject()
+            .put("name", name)
+            .put("groupId", gid)
+            .put("totalAmount", safeAmount)
+            .put("items", JSONArray().put(JSONObject()
+                .put("categoryId", firstCategoryId())
+                .put("amount", safeAmount)
+            ))
+        return request("/api/budgets", "POST", body).dataObject().toBudget(active = true)
     }
 
     fun updateBudget(id: String, amount: Int): Presupuesto {
@@ -66,23 +69,18 @@ class RemoteAppApi {
         return request("/api/budgets/$id", "PUT", body).dataObject().toBudget(active = true)
     }
 
-    fun createOrUpdateProduct(producto: Producto): Producto {
+    fun createProduct(producto: Producto): Producto {
         val categoryId = firstCategoryId()
-        val body = JSONObject()
-            .put("name", producto.nombre)
-            .put("price", (producto.precioEstimado.takeIf { it > 0 } ?: producto.precio).toDouble())
-            .put("categoryId", categoryId)
-            .put("description", producto.descripcion)
-            .put("barcode", producto.codigo)
-            .put("priority", producto.categoria.toBackendPriority())
+        val body = productBody(producto, categoryId)
+        return request("/api/products", "POST", body).dataObject()
+            .toProducto(producto.cantidad, producto.comprado)
+    }
 
-        val isBackendId = runCatching { UUID.fromString(producto.id) }.isSuccess
-        val response = if (isBackendId) {
-            request("/api/products/${producto.id}", "PUT", body).dataObject()
-        } else {
-            request("/api/products", "POST", body).dataObject()
-        }
-        return response.toProducto(producto.cantidad, producto.comprado)
+    fun updateProduct(producto: Producto): Producto {
+        val categoryId = firstCategoryId()
+        val body = productBody(producto, categoryId)
+        return request("/api/products/${producto.id}", "PUT", body).dataObject()
+            .toProducto(producto.cantidad, producto.comprado)
     }
 
     fun deleteProduct(id: String) {
@@ -104,6 +102,16 @@ class RemoteAppApi {
             .put("notes", ticket.supermercado)
             .put("items", items)
         return request("/api/purchases", "POST", body).dataObject().toTicket()
+    }
+
+    fun addMember(usuario: Usuario): Usuario {
+        val gid = groupId ?: ensureGroup().id.also { groupId = it }
+        val body = JSONObject()
+            .put("email", usuario.email)
+            .put("role", usuario.rol.toBackendRole())
+
+        val data = request("/api/groups/$gid/members", "POST", body).dataObject()
+        return data.toUsuario(default = usuario)
     }
 
     private fun getMe(): RemoteProfile? {
@@ -132,12 +140,7 @@ class RemoteAppApi {
         val data = request("/api/groups/$id", "GET").dataObject()
         return RemoteGroupDetail(
             members = data.optJSONArray("members").orEmpty().mapObjects { member ->
-                Usuario(
-                    id = member.optString("id"),
-                    nombre = member.optString("fullName"),
-                    email = member.optString("email"),
-                    rol = if (member.optString("role") == "ADMIN") RolUsuario.ADMIN else RolUsuario.MIEMBRO
-                )
+                member.toUsuario()
             }
         )
     }
@@ -174,6 +177,16 @@ class RemoteAppApi {
         return getProducts().firstOrNull { it.nombre.equals(name, ignoreCase = true) }?.id
     }
 
+    private fun productBody(producto: Producto, categoryId: String): JSONObject {
+        return JSONObject()
+            .put("name", producto.nombre)
+            .put("price", (producto.precioEstimado.takeIf { it > 0 } ?: producto.precio).toDouble())
+            .put("categoryId", categoryId)
+            .put("description", producto.descripcion)
+            .put("barcode", producto.codigo)
+            .put("priority", producto.categoria.toBackendPriority())
+    }
+
     private fun request(path: String, method: String, body: JSONObject? = null): JSONObject {
         val token = AuthSessionStore.accessToken
             ?: throw IllegalStateException("Iniciá sesión para sincronizar con Render.")
@@ -195,7 +208,12 @@ class RemoteAppApi {
         val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
         connection.disconnect()
 
-        val json = text.takeIf { it.isNotBlank() }?.let { JSONObject(it) } ?: JSONObject()
+        val trimmed = text.trim()
+        val json = when {
+            trimmed.isBlank() -> JSONObject()
+            trimmed.startsWith("[") -> JSONObject().put("data", JSONArray(trimmed))
+            else -> JSONObject(trimmed)
+        }
         if (responseCode !in 200..299 || json.optBoolean("success", true).not()) {
             val message = json.optString("message")
                 .ifBlank { json.optString("error") }
@@ -210,7 +228,10 @@ class RemoteAppApi {
     }
 
     private fun JSONObject.dataArray(): JSONArray {
-        return optJSONArray("data") ?: JSONArray()
+        return optJSONArray("data")
+            ?: optJSONArray("items")
+            ?: optJSONArray("results")
+            ?: JSONArray()
     }
 
     private fun JSONArray?.orEmpty(): JSONArray = this ?: JSONArray()
@@ -224,13 +245,13 @@ class RemoteAppApi {
     }
 
     private fun JSONObject.toGroup(): RemoteGroup {
-        return RemoteGroup(id = optString("id"), name = optString("name"))
+        return RemoteGroup(id = optId(), name = optString("name"))
     }
 
     private fun JSONObject.toBudget(active: Boolean): Presupuesto {
         val total = optDouble("totalAmount", 0.0).roundToInt()
         return Presupuesto(
-            id = optString("id"),
+            id = optId(),
             tipo = TipoPresupuesto.FAMILIAR,
             nombre = optString("name").ifBlank { "Familiar" },
             montoTotal = total,
@@ -244,7 +265,7 @@ class RemoteAppApi {
     private fun JSONObject.toProducto(cantidad: Int = 1, comprado: Boolean = false): Producto {
         val price = optDouble("price", 0.0).roundToInt()
         return Producto(
-            id = optString("id"),
+            id = optId(),
             codigo = optString("barcode"),
             nombre = optString("name"),
             descripcion = optString("description"),
@@ -258,14 +279,16 @@ class RemoteAppApi {
 
     private fun JSONObject.toTicket(): Ticket {
         val items = optJSONArray("items").orEmpty().mapObjects {
+            val product = it.optJSONObject("product")
             TicketProducto(
-                nombre = it.optString("productName"),
+                nombre = it.optString("productName")
+                    .ifBlank { product?.optString("name").orEmpty() },
                 precio = optDoubleCompat(it, "unitPrice").roundToInt(),
                 cantidad = it.optInt("quantity", 1)
             )
         }
         return Ticket(
-            id = optString("id"),
+            id = optId(),
             supermercado = optString("storeName").ifBlank { optString("notes").ifBlank { "Supermercado" } },
             direccion = "",
             fechaHora = System.currentTimeMillis(),
@@ -274,6 +297,22 @@ class RemoteAppApi {
             imagenPath = "",
             presupuestoId = optString("groupId"),
             productos = items
+        )
+    }
+
+    private fun JSONObject.toUsuario(default: Usuario? = null): Usuario {
+        val user = optJSONObject("user") ?: optJSONObject("usuario") ?: this
+        val role = optString("role")
+            .ifBlank { user.optString("role") }
+            .ifBlank { default?.rol?.name.orEmpty() }
+
+        return Usuario(
+            id = user.optId().ifBlank { default?.id.orEmpty() },
+            nombre = user.optString("fullName")
+                .ifBlank { user.optString("name") }
+                .ifBlank { default?.nombre.orEmpty() },
+            email = user.optString("email").ifBlank { default?.email.orEmpty() },
+            rol = if (role.equals("ADMIN", ignoreCase = true)) RolUsuario.ADMIN else RolUsuario.MIEMBRO
         )
     }
 
@@ -292,6 +331,14 @@ class RemoteAppApi {
             Categoria.PRINCIPAL -> "PRIMARIO"
             Categoria.SECUNDARIO -> "SECUNDARIO"
         }
+    }
+
+    private fun RolUsuario.toBackendRole(): String {
+        return if (this == RolUsuario.ADMIN) "ADMIN" else "MEMBER"
+    }
+
+    private fun JSONObject.optId(): String {
+        return optString("id").ifBlank { optString("_id") }
     }
 
     private fun String.toCategoria(): Categoria {

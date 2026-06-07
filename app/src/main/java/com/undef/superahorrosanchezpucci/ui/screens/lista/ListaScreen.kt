@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.undef.superahorrosanchezpucci.R
+import com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto
 import com.undef.superahorrosanchezpucci.viewmodel.ListaViewModel
 
 @Composable
@@ -48,8 +49,12 @@ fun ListaScreen(viewModel: ListaViewModel) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     
     val presupuestoActivo = presupuestos.find { it.activo }
-    val isFamiliar = presupuestoActivo?.id == "presupuesto-familiar"
+    val isFamiliar = presupuestoActivo?.tipo != TipoPresupuesto.INDIVIDUAL
     val listaActualId = if (isFamiliar) "lista-familiar" else "lista-individual"
+    val familiarPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.FAMILIAR }?.id
+        ?: "presupuesto-familiar"
+    val individualPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.INDIVIDUAL }?.id
+        ?: "presupuesto-individual"
     
     val listaActual = listas.find { it.id == listaActualId }
     val items = listaActual?.productos ?: emptyList<Producto>()
@@ -115,6 +120,8 @@ fun ListaScreen(viewModel: ListaViewModel) {
                         Box(modifier = Modifier.weight(1f)) {
                             ModeSelector(
                                 activeId = presupuestoActivo?.id ?: "",
+                                individualId = individualPresupuestoId,
+                                familiarId = familiarPresupuestoId,
                                 onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
                             )
                         }

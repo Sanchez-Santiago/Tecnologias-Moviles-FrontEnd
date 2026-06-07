@@ -1,5 +1,6 @@
 package com.undef.superahorrosanchezpucci.ui.screens.auth
 
+import android.util.Patterns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -16,7 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.undef.superahorrosanchezpucci.R
 import com.undef.superahorrosanchezpucci.data.remote.AuthApi
-import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
+import com.undef.superahorrosanchezpucci.viewmodel.AppStateStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,11 +33,23 @@ fun RegisterScreen(navController: NavController) {
     val context = LocalContext.current
     val authApi = remember { AuthApi(context.applicationContext) }
     val scope = rememberCoroutineScope()
+    val colorScheme = MaterialTheme.colorScheme
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = colorScheme.onSurface,
+        unfocusedTextColor = colorScheme.onSurface,
+        focusedLabelColor = colorScheme.primary,
+        unfocusedLabelColor = colorScheme.onSurfaceVariant,
+        cursorColor = colorScheme.primary,
+        focusedBorderColor = colorScheme.primary,
+        unfocusedBorderColor = colorScheme.outline,
+        focusedContainerColor = colorScheme.surface,
+        unfocusedContainerColor = colorScheme.surface
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(colorScheme.background)
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -44,7 +57,8 @@ fun RegisterScreen(navController: NavController) {
         Text(
             text = stringResource(R.string.register_title),
             fontSize = 24.sp,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            color = colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -53,7 +67,8 @@ fun RegisterScreen(navController: NavController) {
             value = name,
             onValueChange = { name = it },
             label = { Text(stringResource(R.string.name_hint)) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = fieldColors
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -62,7 +77,8 @@ fun RegisterScreen(navController: NavController) {
             value = email,
             onValueChange = { email = it },
             label = { Text(stringResource(R.string.email_hint)) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = fieldColors
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -72,7 +88,8 @@ fun RegisterScreen(navController: NavController) {
             onValueChange = { password = it },
             label = { Text(stringResource(R.string.password_hint)) },
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = PasswordVisualTransformation(),
+            colors = fieldColors
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -82,7 +99,8 @@ fun RegisterScreen(navController: NavController) {
             onValueChange = { confirmPassword = it },
             label = { Text(stringResource(R.string.confirm_password_hint)) },
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = PasswordVisualTransformation(),
+            colors = fieldColors
         )
 
         errorMessage?.let { message ->
@@ -101,6 +119,10 @@ fun RegisterScreen(navController: NavController) {
                         errorMessage = "Completá nombre, email y contraseña."
                         return@Button
                     }
+                    !Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() -> {
+                        errorMessage = "Ingresá un email válido."
+                        return@Button
+                    }
                     password != confirmPassword -> {
                         errorMessage = "Las contraseñas no coinciden."
                         return@Button
@@ -117,8 +139,16 @@ fun RegisterScreen(navController: NavController) {
                     isLoading = false
 
                     result
-                        .onSuccess {
-                            navController.navigate("LOGIN") {
+                        .onSuccess { session ->
+                            if (session.token.isNullOrBlank()) {
+                                navController.navigate("LOGIN") {
+                                    popUpTo("REGISTER") { inclusive = true }
+                                }
+                                return@onSuccess
+                            }
+
+                            AppStateStore.get(context.applicationContext as android.app.Application).reload()
+                            navController.navigate("INICIO") {
                                 popUpTo("REGISTER") { inclusive = true }
                             }
                         }
@@ -129,7 +159,12 @@ fun RegisterScreen(navController: NavController) {
             },
             enabled = !isLoading,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colorScheme.primary,
+                contentColor = colorScheme.onPrimary,
+                disabledContainerColor = colorScheme.surfaceVariant,
+                disabledContentColor = colorScheme.onSurfaceVariant
+            )
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -138,7 +173,11 @@ fun RegisterScreen(navController: NavController) {
                     strokeWidth = 2.dp
                 )
             } else {
-                Text(stringResource(R.string.register_button), modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    stringResource(R.string.register_button),
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = colorScheme.onPrimary
+                )
             }
         }
 
@@ -147,7 +186,7 @@ fun RegisterScreen(navController: NavController) {
         TextButton(
             onClick = { navController.popBackStack() }
         ) {
-            Text(stringResource(R.string.have_account), color = Emerald700)
+            Text(stringResource(R.string.have_account), color = colorScheme.primary)
         }
     }
 }

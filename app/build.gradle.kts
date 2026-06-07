@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     alias(libs.plugins.kotlin.compose)
     id("kotlin-parcelize")
+    id("org.jetbrains.kotlin.kapt")
 }
 android {
     namespace = "com.undef.superahorrosanchezpucci"
@@ -61,7 +62,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.navigation.runtime.ktx)
-    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-runtime:2.8.4")
+    kapt("androidx.room:room-compiler:2.8.4")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

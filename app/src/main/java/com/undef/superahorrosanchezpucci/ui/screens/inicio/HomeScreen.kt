@@ -27,6 +27,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.undef.superahorrosanchezpucci.R
 import com.undef.superahorrosanchezpucci.data.model.Categoria
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
+import com.undef.superahorrosanchezpucci.data.model.RolUsuario
+import com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto
 import com.undef.superahorrosanchezpucci.data.model.Usuario
 import com.undef.superahorrosanchezpucci.ui.components.HomeSkeleton
 import com.undef.superahorrosanchezpucci.ui.theme.*
@@ -46,6 +48,10 @@ fun HomeScreen(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     val presupuestoActivo = presupuestos.find { it.activo }
+    val familiarPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.FAMILIAR }?.id
+        ?: "presupuesto-familiar"
+    val individualPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.INDIVIDUAL }?.id
+        ?: "presupuesto-individual"
     val tickets = allTickets
         .filter { it.presupuestoId == presupuestoActivo?.id }
         .sortedByDescending { it.fechaHora }
@@ -63,7 +69,13 @@ fun HomeScreen(
     }.value
 
     Scaffold(
-        topBar = { Header(onNavigateToNotifications, isCritical) },
+        topBar = {
+            Header(
+                onNotificationsClick = onNavigateToNotifications,
+                isCritical = isCritical,
+                currentUser = usuarios.firstOrNull { it.rol == RolUsuario.ADMIN } ?: usuarios.firstOrNull()
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (isLoading) {
@@ -82,13 +94,15 @@ fun HomeScreen(
                 item { 
                     ModeSelector(
                         activeId = presupuestoActivo?.id ?: "",
+                        individualId = individualPresupuestoId,
+                        familiarId = familiarPresupuestoId,
                         onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
                     ) 
                 }
 
                 item { 
                     presupuestoActivo?.let { presupuesto ->
-                        val listaId = if (presupuesto.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
+                        val listaId = if (presupuesto.tipo == TipoPresupuesto.FAMILIAR) "lista-familiar" else "lista-individual"
                         val estimados = viewModel.getEstimadosPorCategoria(listaId)
                         
                         BudgetHero(
@@ -150,7 +164,11 @@ fun formatPrice(amount: Int): String {
 }
 
 @Composable
-fun Header(onNotificationsClick: () -> Unit, isCritical: Boolean = false) {
+fun Header(
+    onNotificationsClick: () -> Unit,
+    isCritical: Boolean = false,
+    currentUser: Usuario? = null
+) {
     val headerColor = if (isCritical) {
         Brush.horizontalGradient(listOf(Amber500.copy(alpha = 0.2f), Rose500.copy(alpha = 0.2f)))
     } else {
@@ -181,7 +199,7 @@ fun Header(onNotificationsClick: () -> Unit, isCritical: Boolean = false) {
                     )
                 )
                 Text(
-                    text = "Hola, Santiago",
+                    text = "Hola, ${currentUser?.nombre?.takeIf { it.isNotBlank() } ?: "Usuario"}",
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium,
@@ -233,7 +251,12 @@ fun Header(onNotificationsClick: () -> Unit, isCritical: Boolean = false) {
 }
 
 @Composable
-fun ModeSelector(activeId: String, onModeChange: (String) -> Unit) {
+fun ModeSelector(
+    activeId: String,
+    onModeChange: (String) -> Unit,
+    individualId: String = "presupuesto-individual",
+    familiarId: String = "presupuesto-familiar"
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -243,17 +266,17 @@ fun ModeSelector(activeId: String, onModeChange: (String) -> Unit) {
             .padding(6.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            val isIndividual = activeId == "presupuesto-individual"
+            val isIndividual = activeId == individualId
             SelectorItem(
                 text = "INDIVIDUAL",
                 isSelected = isIndividual,
-                onClick = { onModeChange("presupuesto-individual") },
+                onClick = { onModeChange(individualId) },
                 modifier = Modifier.weight(1f)
             )
             SelectorItem(
                 text = "FAMILIAR",
                 isSelected = !isIndividual,
-                onClick = { onModeChange("presupuesto-familiar") },
+                onClick = { onModeChange(familiarId) },
                 modifier = Modifier.weight(1f)
             )
         }

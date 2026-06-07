@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.undef.superahorrosanchezpucci.R
+import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald500
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
 import kotlinx.coroutines.delay
@@ -24,7 +25,8 @@ import kotlinx.coroutines.delay
 fun SplashScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         delay(2500)
-        navController.navigate("LOGIN") {
+        val destination = if (AuthSessionStore.accessToken.isNullOrBlank()) "LOGIN" else "INICIO"
+        navController.navigate(destination) {
             popUpTo("SPLASH") { inclusive = true }
         }
     }

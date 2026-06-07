@@ -11,4 +11,6 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     val themeMode: StateFlow<ThemeMode> = store.themeMode
 
     fun updateThemeMode(mode: ThemeMode) = store.updateThemeMode(mode)
+
+    fun cerrarSesion() = store.cerrarSesion()
 }

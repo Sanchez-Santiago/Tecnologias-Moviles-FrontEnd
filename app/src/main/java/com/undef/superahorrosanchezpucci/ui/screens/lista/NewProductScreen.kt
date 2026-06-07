@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.undef.superahorrosanchezpucci.data.model.Categoria
-import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.Producto
+import com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto
 import com.undef.superahorrosanchezpucci.ui.theme.*
 import com.undef.superahorrosanchezpucci.viewmodel.ListaViewModel
 import java.util.*
@@ -260,7 +260,7 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
                             
                             // Determinar en qué lista guardarlo basándose en el presupuesto activo
                             val presupuestoActivo = presupuestos.find { it.activo }
-                            val listaId = if (presupuestoActivo?.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
+                            val listaId = if (presupuestoActivo?.tipo == TipoPresupuesto.INDIVIDUAL) "lista-individual" else "lista-familiar"
                             
                             println("DEBUG: Intentando guardar producto: $newProduct en lista: $listaId")
                             viewModel.agregarProducto(listaId, newProduct)

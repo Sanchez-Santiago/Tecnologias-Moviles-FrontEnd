@@ -20,8 +20,9 @@ import kotlinx.coroutines.launch
 
 class AppStateStore private constructor(application: Application) {
 
+    private val appContext = application.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val repository = AppRepository()
+    private val repository = AppRepository(appContext)
 
     private val _presupuestos = MutableStateFlow<List<Presupuesto>>(emptyList())
     val presupuestos: StateFlow<List<Presupuesto>> = _presupuestos.asStateFlow()
@@ -129,6 +130,14 @@ class AppStateStore private constructor(application: Application) {
         _themeMode.value = mode
         scope.launch {
             repository.updateThemeMode(mode)
+        }
+    }
+
+    fun cerrarSesion() {
+        AuthSessionStore.clear(appContext)
+        scope.launch {
+            repository.cerrarSesion()
+            refrescar()
         }
     }
 

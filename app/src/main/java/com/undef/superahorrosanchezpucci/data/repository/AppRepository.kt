@@ -1,5 +1,10 @@
 package com.undef.superahorrosanchezpucci.data.repository
 
+import android.content.Context
+import com.undef.superahorrosanchezpucci.data.local.AppDatabase
+import com.undef.superahorrosanchezpucci.data.local.toEntity
+import com.undef.superahorrosanchezpucci.data.local.toModel
+import com.undef.superahorrosanchezpucci.data.local.toThemeMode
 import com.undef.superahorrosanchezpucci.data.model.*
 import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.data.remote.RemoteAppApi
@@ -7,8 +12,10 @@ import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class AppRepository {
+class AppRepository(context: Context) {
+    private val prefs = context.getSharedPreferences("repository_migrations", Context.MODE_PRIVATE)
     private val remoteApi = RemoteAppApi()
+    private val dao = AppDatabase.get(context).appDao()
 
     var presupuestos = mutableListOf<Presupuesto>()
         private set
@@ -30,68 +37,34 @@ class AppRepository {
     // ----------------------
 
     suspend fun cargarTodo() = withContext(Dispatchers.IO) {
+        cargarLocal()
+
         if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            val needsListCleanup = !prefs.getBoolean(REMOTE_PRODUCTS_CLEANUP_DONE, false)
             val remoteState = remoteApi.loadState()
-            presupuestos = remoteState.presupuestos.toMutableList()
-            listas = remoteState.listas.toMutableList()
+            presupuestos = mergePresupuestos(locales = presupuestos, remotos = remoteState.presupuestos).toMutableList()
+            listas = if (needsListCleanup) {
+                prefs.edit().putBoolean(REMOTE_PRODUCTS_CLEANUP_DONE, true).apply()
+                listasBase().toMutableList()
+            } else {
+                listas.takeIf { it.isNotEmpty() } ?: listasBase().toMutableList()
+            }
             tickets = remoteState.tickets.toMutableList()
-            usuarios = remoteState.usuarios.toMutableList()
+            usuarios = mergeUsuarios(locales = usuarios, remotos = remoteState.usuarios).toMutableList()
+            guardarTodo()
             return@withContext
         }
 
-        inicializarDatos()
+        if (presupuestos.isEmpty() || listas.isEmpty()) {
+            inicializarDatos()
+        }
     }
 
     private suspend fun inicializarDatos() {
-        val familiarId = "presupuesto-familiar"
-        val individualId = "presupuesto-individual"
-
-        val familiar = Presupuesto(
-            id = familiarId,
-            tipo = TipoPresupuesto.FAMILIAR,
-            nombre = "Familiar",
-            montoTotal = 0,
-            montoDisponible = 0,
-            fechaInicio = System.currentTimeMillis(),
-            fechaFin = null,
-            activo = true
-        )
-
-        val individual = Presupuesto(
-            id = individualId,
-            tipo = TipoPresupuesto.INDIVIDUAL,
-            nombre = "Individual",
-            montoTotal = 0,
-            montoDisponible = 0,
-            fechaInicio = System.currentTimeMillis(),
-            fechaFin = null,
-            activo = false
-        )
-
-        presupuestos.add(familiar)
-        presupuestos.add(individual)
-
-        // Inicializar listas base
-        listas.add(
-            ListaCompra(
-                id = "lista-familiar",
-                nombre = "Lista Familiar",
-                presupuestoId = familiarId,
-                esFamiliar = true,
-                fechaCreacion = System.currentTimeMillis(),
-                productos = mutableListOf()
-            )
-        )
-        listas.add(
-            ListaCompra(
-                id = "lista-individual",
-                nombre = "Lista Individual",
-                presupuestoId = individualId,
-                esFamiliar = false,
-                fechaCreacion = System.currentTimeMillis(),
-                productos = mutableListOf()
-            )
-        )
+        presupuestos.clear()
+        listas.clear()
+        presupuestos.addAll(presupuestosBase())
+        listas.addAll(listasBase())
 
         guardarTodo()
     }
@@ -101,8 +74,42 @@ class AppRepository {
     // ----------------------
 
     suspend fun guardarTodo() = withContext(Dispatchers.IO) {
-        // El estado principal se sincroniza con Render. Esta función queda como
-        // compatibilidad para las pantallas que actualizan estado en memoria.
+        val productos = listas.flatMap { lista ->
+            lista.productos.map { producto -> producto.toEntity(lista.id) }
+        }
+        val ticketProductos = tickets.flatMap { ticket ->
+            ticket.productos.mapIndexed { index, producto -> producto.toEntity(ticket.id, index) }
+        }
+        dao.replaceAll(
+            presupuestos = presupuestos.map { it.toEntity() },
+            listas = listas.map { it.toEntity() },
+            productos = productos,
+            tickets = tickets.map { it.toEntity() },
+            ticketProductos = ticketProductos,
+            usuarios = usuarios.map { it.toEntity() },
+            config = themeMode.toEntity()
+        )
+    }
+
+    private suspend fun cargarLocal() {
+        val productosPorLista = dao.getProductos()
+            .groupBy { it.listaId }
+            .mapValues { entry -> entry.value.map { it.toModel() } }
+        listas = dao.getListas()
+            .map { lista -> lista.toModel(productosPorLista[lista.id].orEmpty()) }
+            .toMutableList()
+
+        presupuestos = dao.getPresupuestos().map { it.toModel() }.toMutableList()
+
+        val ticketProductos = dao.getTicketProductos()
+            .groupBy { it.ticketId }
+            .mapValues { entry -> entry.value.map { it.toModel() } }
+        tickets = dao.getTickets()
+            .map { ticket -> ticket.toModel(ticketProductos[ticket.id].orEmpty()) }
+            .toMutableList()
+
+        usuarios = dao.getUsuarios().map { it.toModel() }.toMutableList()
+        themeMode = dao.getConfig()?.toThemeMode() ?: ThemeMode.SYSTEM
     }
 
     // ----------------------
@@ -129,24 +136,36 @@ class AppRepository {
     }
 
     suspend fun actualizarPresupuesto(id: String, nuevoMonto: Int) {
-        if (!AuthSessionStore.accessToken.isNullOrBlank() && id != "presupuesto-familiar" && id != "presupuesto-individual") {
-            val actualizado = remoteApi.updateBudget(id, nuevoMonto)
-            val index = presupuestos.indexOfFirst { it.id == id }
-            if (index != -1) {
-                presupuestos[index] = actualizado
+        val index = presupuestos.indexOfFirst { it.id == id }
+        if (index == -1) return
+
+        val actual = presupuestos[index]
+        val gastado = actual.montoTotal - actual.montoDisponible
+        val localActualizado = actual.copy(
+            montoTotal = nuevoMonto,
+            montoDisponible = nuevoMonto - gastado
+        )
+
+        if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            val esPresupuestoLocal = id == "presupuesto-familiar" || id == "presupuesto-individual"
+            val remoto = runCatching {
+                if (esPresupuestoLocal) {
+                    remoteApi.createBudget(actual.nombre, nuevoMonto)
+                } else {
+                    remoteApi.updateBudget(id, nuevoMonto)
+                }
+            }.getOrNull()
+
+            presupuestos[index] = if (remoto != null && !esPresupuestoLocal) {
+                remoto.copy(activo = actual.activo)
+            } else {
+                localActualizado
             }
+            guardarTodo()
             return
         }
 
-        val index = presupuestos.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val actual = presupuestos[index]
-            val gastado = actual.montoTotal - actual.montoDisponible
-            presupuestos[index] = actual.copy(
-                montoTotal = nuevoMonto,
-                montoDisponible = nuevoMonto - gastado
-            )
-        }
+        presupuestos[index] = localActualizado
         guardarTodo()
     }
 
@@ -159,35 +178,25 @@ class AppRepository {
         guardarTodo()
     }
 
-    suspend fun agregarOActualizarProducto(listaId: String, producto: Producto) {
-        val productoRemoto = if (!AuthSessionStore.accessToken.isNullOrBlank()) {
-            runCatching { remoteApi.createOrUpdateProduct(producto) }.getOrElse { producto }
+    suspend fun agregarOActualizarProducto(listaId: String, producto: Producto) = withContext(Dispatchers.IO) {
+        val indexLista = listas.indexOfFirst { it.id == listaId }
+        if (indexLista == -1) return@withContext
+
+        val lista = listas[indexLista]
+        val nuevosProductos = lista.productos.toMutableList()
+        val indexProd = nuevosProductos.indexOfFirst { it.id == producto.id }
+
+        if (indexProd != -1) {
+            nuevosProductos[indexProd] = producto
         } else {
-            producto
+            nuevosProductos.add(producto)
         }
 
-        val indexLista = listas.indexOfFirst { it.id == listaId }
-        if (indexLista != -1) {
-            val lista = listas[indexLista]
-            val nuevosProductos = lista.productos.toMutableList()
-            
-            val indexProd = nuevosProductos.indexOfFirst { it.id == producto.id || it.id == productoRemoto.id }
-            if (indexProd != -1) {
-                nuevosProductos[indexProd] = productoRemoto
-            } else {
-                nuevosProductos.add(productoRemoto)
-            }
-            
-            listas[indexLista] = lista.copy(productos = nuevosProductos)
-            guardarTodo()
-        }
+        listas[indexLista] = lista.copy(productos = nuevosProductos)
+        guardarTodo()
     }
 
     suspend fun eliminarProducto(listaId: String, productoId: String) {
-        if (!AuthSessionStore.accessToken.isNullOrBlank()) {
-            runCatching { remoteApi.deleteProduct(productoId) }
-        }
-
         val indexLista = listas.indexOfFirst { it.id == listaId }
         if (indexLista != -1) {
             val lista = listas[indexLista]
@@ -278,8 +287,18 @@ class AppRepository {
     // USUARIOS
     // ----------------------
 
-    suspend fun agregarUsuario(usuario: Usuario) {
-        usuarios.add(usuario)
+    suspend fun agregarUsuario(usuario: Usuario) = withContext(Dispatchers.IO) {
+        val usuarioFinal = if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            runCatching { remoteApi.addMember(usuario) }.getOrElse { usuario }
+        } else {
+            usuario
+        }
+        usuarios.removeAll { it.id == usuarioFinal.id || it.email.equals(usuarioFinal.email, ignoreCase = true) }
+        usuarios.add(usuarioFinal)
+        guardarTodo()
+    }
+
+    suspend fun cerrarSesion() {
         guardarTodo()
     }
 
@@ -290,5 +309,75 @@ class AppRepository {
     suspend fun updateThemeMode(mode: ThemeMode) {
         themeMode = mode
         guardarTodo()
+    }
+
+    private fun presupuestosBase(): List<Presupuesto> {
+        return listOf(
+            Presupuesto(
+                id = "presupuesto-familiar",
+                tipo = TipoPresupuesto.FAMILIAR,
+                nombre = "Familiar",
+                montoTotal = 0,
+                montoDisponible = 0,
+                fechaInicio = System.currentTimeMillis(),
+                fechaFin = null,
+                activo = true
+            ),
+            Presupuesto(
+                id = "presupuesto-individual",
+                tipo = TipoPresupuesto.INDIVIDUAL,
+                nombre = "Individual",
+                montoTotal = 0,
+                montoDisponible = 0,
+                fechaInicio = System.currentTimeMillis(),
+                fechaFin = null,
+                activo = false
+            )
+        )
+    }
+
+    private fun listasBase(): List<ListaCompra> {
+        return listOf(
+            ListaCompra(
+                id = "lista-familiar",
+                nombre = "Lista Familiar",
+                presupuestoId = "presupuesto-familiar",
+                esFamiliar = true,
+                fechaCreacion = System.currentTimeMillis(),
+                productos = mutableListOf()
+            ),
+            ListaCompra(
+                id = "lista-individual",
+                nombre = "Lista Individual",
+                presupuestoId = "presupuesto-individual",
+                esFamiliar = false,
+                fechaCreacion = System.currentTimeMillis(),
+                productos = mutableListOf()
+            )
+        )
+    }
+
+    private fun mergeUsuarios(locales: List<Usuario>, remotos: List<Usuario>): List<Usuario> {
+        val merged = linkedMapOf<String, Usuario>()
+        (remotos + locales).forEach { usuario ->
+            val key = usuario.email.lowercase().ifBlank { usuario.id }
+            if (key.isNotBlank()) {
+                merged[key] = usuario
+            }
+        }
+        return merged.values.toList()
+    }
+
+    private fun mergePresupuestos(locales: List<Presupuesto>, remotos: List<Presupuesto>): List<Presupuesto> {
+        val base = if (remotos.isNotEmpty()) remotos else presupuestosBase()
+        return base.map { remoto ->
+            locales.firstOrNull { local ->
+                local.id == remoto.id || local.tipo == remoto.tipo
+            } ?: remoto
+        }.ifEmpty { locales.ifEmpty { presupuestosBase() } }
+    }
+
+    companion object {
+        private const val REMOTE_PRODUCTS_CLEANUP_DONE = "remote_products_cleanup_done"
     }
 }
