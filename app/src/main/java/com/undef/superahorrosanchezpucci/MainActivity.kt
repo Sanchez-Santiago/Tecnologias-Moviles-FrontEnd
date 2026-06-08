@@ -44,6 +44,7 @@ import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.viewmodel.FamilyViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.HomeViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ListaViewModel
+import com.undef.superahorrosanchezpucci.viewmodel.OfertasViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ProfileViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ThemeViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.TicketsViewModel
@@ -110,7 +111,10 @@ fun MainScreen() {
                 val ticketsViewModel: TicketsViewModel = viewModel()
                 TicketsScreen(ticketsViewModel)
             }
-            composable("OFERTAS") { OfertasScreen() }
+            composable("OFERTAS") {
+                val ofertasViewModel: OfertasViewModel = viewModel()
+                OfertasScreen(ofertasViewModel)
+            }
             composable("PERFIL") {
                 val profileViewModel: ProfileViewModel = viewModel()
                 ProfileScreen(profileViewModel, navController)

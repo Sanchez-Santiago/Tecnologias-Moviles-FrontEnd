@@ -49,7 +49,7 @@ class AppRepository(context: Context) {
             } else {
                 listas.takeIf { it.isNotEmpty() } ?: listasBase().toMutableList()
             }
-            tickets = remoteState.tickets.toMutableList()
+            tickets = mergeTickets(locales = tickets, remotos = remoteState.tickets).toMutableList()
             usuarios = mergeUsuarios(locales = usuarios, remotos = remoteState.usuarios).toMutableList()
             guardarTodo()
             return@withContext
@@ -239,16 +239,26 @@ class AppRepository(context: Context) {
     // ----------------------
 
     suspend fun agregarTicket(ticket: Ticket) {
-        if (!AuthSessionStore.accessToken.isNullOrBlank()) {
-            val remoteTicket = remoteApi.addPurchase(ticket)
-            tickets.add(remoteTicket)
-            return
-        }
-
         val presupuestoActivo = presupuestos.find { it.activo }
         val ticketVinculado = if (presupuestoActivo != null) {
-            ticket.copy(presupuestoId = presupuestoActivo.id)
+            ticket.copy(presupuestoId = ticket.presupuestoId.ifBlank { presupuestoActivo.id })
         } else ticket
+
+        if (!AuthSessionStore.accessToken.isNullOrBlank()) {
+            val ticketGuardado = if (ticketVinculado.productos.isNotEmpty()) {
+                runCatching { remoteApi.addPurchase(ticketVinculado) }
+                    .getOrElse { ticketVinculado }
+            } else {
+                ticketVinculado
+            }
+            tickets.removeAll { it.id == ticketGuardado.id }
+            tickets.add(ticketGuardado)
+            if (presupuestoActivo != null) {
+                gastar(presupuestoActivo.id, ticketGuardado.total)
+            }
+            guardarTodo()
+            return
+        }
 
         tickets.add(ticketVinculado)
         
@@ -375,6 +385,22 @@ class AppRepository(context: Context) {
                 local.id == remoto.id || local.tipo == remoto.tipo
             } ?: remoto
         }.ifEmpty { locales.ifEmpty { presupuestosBase() } }
+    }
+
+    private fun mergeTickets(locales: List<Ticket>, remotos: List<Ticket>): List<Ticket> {
+        if (remotos.isEmpty()) return locales
+
+        val combinados = remotos.toMutableList()
+        locales.forEach { local ->
+            val index = combinados.indexOfFirst { it.id == local.id }
+            if (index == -1) {
+                combinados.add(local)
+            } else if (local.imagenPath.isNotBlank() && combinados[index].imagenPath.isBlank()) {
+                combinados[index] = combinados[index].copy(imagenPath = local.imagenPath)
+            }
+        }
+
+        return combinados
     }
 
     companion object {

@@ -188,8 +188,7 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
                         CustomTextField(
                             value = brand,
                             onValueChange = { brand = it },
-                            placeholder = "Marca",
-                            height = 48.dp
+                            placeholder = "Marca"
                         )
                     }
                     FormField(label = "Precio Est. *", modifier = Modifier.weight(1f)) {
@@ -201,7 +200,6 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
                             },
                             placeholder = "0.00",
                             leadingIcon = Icons.Default.LocalOffer,
-                            height = 48.dp,
                             keyboardType = KeyboardType.Number
                         )
                     }
@@ -357,6 +355,10 @@ fun CustomTextField(
                 cursorColor = MaterialTheme.colorScheme.primary,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            ),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 16.sp
             ),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
