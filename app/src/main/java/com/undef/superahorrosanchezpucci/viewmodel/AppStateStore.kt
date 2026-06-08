@@ -6,6 +6,7 @@ import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Producto
 import com.undef.superahorrosanchezpucci.data.model.Ticket
+import com.undef.superahorrosanchezpucci.data.model.TicketImageAnalysis
 import com.undef.superahorrosanchezpucci.data.model.Usuario
 import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.data.repository.AppRepository
@@ -117,6 +118,10 @@ class AppStateStore private constructor(application: Application) {
             repository.actualizarTicket(ticket)
             refrescar()
         }
+    }
+
+    suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
+        return repository.analizarTicketImagen(imageBytes, mimeType)
     }
 
     fun agregarUsuario(usuario: Usuario) {

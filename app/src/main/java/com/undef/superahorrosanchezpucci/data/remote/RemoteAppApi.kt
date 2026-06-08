@@ -1,5 +1,6 @@
 package com.undef.superahorrosanchezpucci.data.remote
 
+import android.util.Base64
 import com.undef.superahorrosanchezpucci.data.model.Categoria
 import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.MetodoPago
@@ -7,6 +8,7 @@ import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Producto
 import com.undef.superahorrosanchezpucci.data.model.RolUsuario
 import com.undef.superahorrosanchezpucci.data.model.Ticket
+import com.undef.superahorrosanchezpucci.data.model.TicketImageAnalysis
 import com.undef.superahorrosanchezpucci.data.model.TicketProducto
 import com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto
 import com.undef.superahorrosanchezpucci.data.model.Usuario
@@ -104,6 +106,17 @@ class RemoteAppApi {
         return request("/api/purchases", "POST", body).dataObject().toTicket()
     }
 
+    fun analyzeTicketImage(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
+        val imageBase64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+        val body = JSONObject()
+            .put("imageBase64", imageBase64)
+            .put("mimeType", mimeType)
+
+        return request("/api/tickets/analyze-image", "POST", body, readTimeoutMs = 70_000)
+            .dataObject()
+            .toTicketImageAnalysis()
+    }
+
     fun addMember(usuario: Usuario): Usuario {
         val gid = groupId ?: ensureGroup().id.also { groupId = it }
         val body = JSONObject()
@@ -187,7 +200,12 @@ class RemoteAppApi {
             .put("priority", producto.categoria.toBackendPriority())
     }
 
-    private fun request(path: String, method: String, body: JSONObject? = null): JSONObject {
+    private fun request(
+        path: String,
+        method: String,
+        body: JSONObject? = null,
+        readTimeoutMs: Int = 15_000
+    ): JSONObject {
         val token = AuthSessionStore.accessToken
             ?: throw IllegalStateException("Iniciá sesión para sincronizar con Render.")
         val connection = (URL("${ApiConfig.BASE_URL}$path").openConnection() as HttpURLConnection)
@@ -195,7 +213,7 @@ class RemoteAppApi {
         connection.setRequestProperty("Accept", "application/json")
         connection.setRequestProperty("Authorization", "Bearer $token")
         connection.connectTimeout = 15_000
-        connection.readTimeout = 15_000
+        connection.readTimeout = readTimeoutMs
 
         if (body != null) {
             connection.doOutput = true
@@ -297,6 +315,29 @@ class RemoteAppApi {
             imagenPath = "",
             presupuestoId = optString("groupId"),
             productos = items
+        )
+    }
+
+    private fun JSONObject.toTicketImageAnalysis(): TicketImageAnalysis {
+        val products = optJSONArray("products").orEmpty().mapObjects { item ->
+            val quantity = optDoubleCompat(item, "quantity").takeIf { it > 0 }?.roundToInt() ?: 1
+            val price = optDoubleCompat(item, "unitPrice")
+                .takeIf { it > 0 }
+                ?: optDoubleCompat(item, "totalPrice").takeIf { it > 0 }
+                ?: 0.0
+
+            TicketProducto(
+                nombre = item.optString("name").ifBlank { "Producto" },
+                precio = price.roundToInt(),
+                cantidad = quantity.coerceAtLeast(1)
+            )
+        }.filter { it.nombre.isNotBlank() && it.precio > 0 }
+
+        return TicketImageAnalysis(
+            storeName = optString("storeName").takeIf { it.isNotBlank() && it != "null" },
+            purchaseDate = optString("purchaseDate").takeIf { it.isNotBlank() && it != "null" },
+            total = optDoubleCompat(this, "total").takeIf { it > 0 }?.roundToInt(),
+            products = products
         )
     }
 

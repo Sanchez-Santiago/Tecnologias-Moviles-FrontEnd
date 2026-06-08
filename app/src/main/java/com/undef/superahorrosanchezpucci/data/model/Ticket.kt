@@ -23,6 +23,13 @@ data class TicketProducto(
     val cantidad: Int = 1
 ) : Parcelable
 
+data class TicketImageAnalysis(
+    val storeName: String?,
+    val purchaseDate: String?,
+    val total: Int?,
+    val products: List<TicketProducto>
+)
+
 @Parcelize
 enum class MetodoPago : Parcelable {
     EFECTIVO,

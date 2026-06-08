@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Ticket
+import com.undef.superahorrosanchezpucci.data.model.TicketImageAnalysis
 import kotlinx.coroutines.flow.StateFlow
 
 class TicketsViewModel(application: Application) : AndroidViewModel(application) {
@@ -20,4 +21,8 @@ class TicketsViewModel(application: Application) : AndroidViewModel(application)
     fun eliminarTicket(id: String) = store.eliminarTicket(id)
 
     fun actualizarTicket(ticket: Ticket) = store.actualizarTicket(ticket)
+
+    suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
+        return store.analizarTicketImagen(imageBytes, mimeType)
+    }
 }

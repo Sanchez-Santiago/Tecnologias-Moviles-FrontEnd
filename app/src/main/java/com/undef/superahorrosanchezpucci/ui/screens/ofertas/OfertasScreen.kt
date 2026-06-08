@@ -7,9 +7,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,6 +33,7 @@ import kotlin.math.abs
 data class Oferta(
     val supermercado: String,
     val producto: String,
+    val descripcion: String,
     val precioAnterior: Int,
     val precioOferta: Int,
     val descuento: Int,
@@ -42,6 +43,7 @@ data class Oferta(
 
 private data class ProductoFrecuente(
     val nombre: String,
+    val descripcion: String,
     val precioBase: Int,
     val score: Int
 )
@@ -78,8 +80,6 @@ fun OfertasScreen(viewModel: OfertasViewModel) {
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            OfferSyncBanner()
-
             when {
                 isLoading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -103,33 +103,6 @@ fun OfertasScreen(viewModel: OfertasViewModel) {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun OfferSyncBanner() {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.CloudSync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                "PERSONALIZACION LOCAL ACTIVA",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-            )
         }
     }
 }
@@ -182,9 +155,19 @@ fun OfertaCard(oferta: Oferta) {
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(oferta.supermercado, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Store, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        "Supermercado: ${oferta.supermercado}",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
                 Text(oferta.producto, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(oferta.descripcion, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 Text(oferta.motivo, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -244,6 +227,8 @@ private fun generarOfertasPersonalizadas(
                 key,
                 ProductoFrecuente(
                     nombre = actual?.nombre ?: nombre,
+                    descripcion = actual?.descripcion?.takeIf { it.isNotBlank() }
+                        ?: producto.descripcion.ifBlank { descripcionReferencia(nombre) },
                     precioBase = maxOf(actual?.precioBase ?: 0, precio),
                     score = (actual?.score ?: 0) + score
                 )
@@ -260,6 +245,8 @@ private fun generarOfertasPersonalizadas(
                 key,
                 ProductoFrecuente(
                     nombre = actual?.nombre ?: nombre,
+                    descripcion = actual?.descripcion?.takeIf { it.isNotBlank() }
+                        ?: descripcionReferencia(nombre),
                     precioBase = maxOf(actual?.precioBase ?: 0, precio),
                     score = (actual?.score ?: 0) + (producto.cantidad * 3)
                 )
@@ -283,12 +270,21 @@ private fun ProductoFrecuente.toOferta(index: Int): Oferta {
     val descuento = 12 + abs(nombre.hashCode() + index).mod(24)
     val precioAnterior = precioBase.takeIf { it > 0 } ?: precioReferencia(nombre)
     val precioOferta = (precioAnterior * (100 - descuento) / 100.0).toInt().coerceAtLeast(1)
-    val supermercados = listOf("Carrefour", "Coto", "Jumbo", "Disco", "ChangoMas", "Dia")
+    val supermercados = listOf(
+        "Carrefour",
+        "Coto",
+        "Jumbo",
+        "Disco",
+        "Vea",
+        "La Anonima",
+        "Hipermercado Libertad"
+    )
     val supermercado = supermercados[abs(nombre.hashCode() + index).mod(supermercados.size)]
 
     return Oferta(
         supermercado = supermercado,
         producto = nombre,
+        descripcion = descripcion.ifBlank { descripcionReferencia(nombre) },
         precioAnterior = precioAnterior,
         precioOferta = precioOferta,
         descuento = descuento,
@@ -299,11 +295,28 @@ private fun ProductoFrecuente.toOferta(index: Int): Oferta {
 
 private fun productosBase(): List<ProductoFrecuente> {
     return listOf(
-        ProductoFrecuente("Leche Entera 1L", 1200, 1),
-        ProductoFrecuente("Pan Tajado", 1800, 1),
-        ProductoFrecuente("Arroz 1kg", 2500, 1),
-        ProductoFrecuente("Aceite Girasol 1.5L", 4200, 1)
+        ProductoFrecuente("Leche Entera 1L", "Lacteo de compra frecuente", 1200, 1),
+        ProductoFrecuente("Pan Tajado", "Panificado para reposicion semanal", 1800, 1),
+        ProductoFrecuente("Arroz 1kg", "Almacen basico para la lista", 2500, 1),
+        ProductoFrecuente("Aceite Girasol 1.5L", "Producto de cocina y despensa", 4200, 1)
     )
+}
+
+private fun descripcionReferencia(nombre: String): String {
+    val normalized = normalizarProducto(nombre)
+    return when {
+        "leche" in normalized -> "Lacteo de compra frecuente"
+        "pan" in normalized -> "Panificado para reposicion semanal"
+        "arroz" in normalized -> "Almacen basico para la lista"
+        "aceite" in normalized -> "Producto de cocina y despensa"
+        "yerba" in normalized -> "Infusion habitual del hogar"
+        "azucar" in normalized -> "Almacen y desayuno"
+        "fideo" in normalized || "pasta" in normalized -> "Almacen para comidas rapidas"
+        "huevo" in normalized -> "Proteina fresca de alta rotacion"
+        "pollo" in normalized -> "Fresco recomendado para planificar comidas"
+        "carne" in normalized -> "Corte fresco para compras grandes"
+        else -> "Oferta sugerida segun tu historial"
+    }
 }
 
 private fun precioReferencia(nombre: String): Int {

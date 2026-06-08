@@ -293,6 +293,13 @@ class AppRepository(context: Context) {
         }
     }
 
+    suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis = withContext(Dispatchers.IO) {
+        if (AuthSessionStore.accessToken.isNullOrBlank()) {
+            throw IllegalStateException("Iniciá sesión para analizar tickets con IA.")
+        }
+        remoteApi.analyzeTicketImage(imageBytes, mimeType)
+    }
+
     // ----------------------
     // USUARIOS
     // ----------------------

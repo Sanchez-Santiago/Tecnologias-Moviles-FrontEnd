@@ -53,6 +53,9 @@ import com.undef.superahorrosanchezpucci.viewmodel.TicketsViewModel
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import java.util.*
 
@@ -567,6 +570,7 @@ fun ProductItemRow(product: TicketProducto) {
 @Composable
 fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = null, onClose: () -> Unit) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val calendar = Calendar.getInstance()
     if (ticketToEdit != null) calendar.timeInMillis = ticketToEdit.fechaHora
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
@@ -579,6 +583,8 @@ fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = n
     var productName by rememberSaveable { mutableStateOf("") }
     var productPrice by rememberSaveable { mutableStateOf("") }
     var productQuantity by rememberSaveable { mutableStateOf("1") }
+    var isAnalyzingTicket by rememberSaveable { mutableStateOf(false) }
+    var analysisError by rememberSaveable { mutableStateOf<String?>(null) }
     val ticketProducts = remember(ticketToEdit?.id) {
         mutableStateListOf<TicketProducto>().apply {
             addAll(ticketToEdit?.productos.orEmpty())
@@ -648,6 +654,48 @@ fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = n
             }
         }
         return filename
+    }
+
+    fun parseAnalyzedDate(value: String?): Long? {
+        if (value.isNullOrBlank()) return null
+        val formats = listOf("yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy", "dd MMM yyyy")
+        return formats.firstNotNullOfOrNull { pattern ->
+            runCatching {
+                SimpleDateFormat(pattern, Locale.getDefault()).apply { isLenient = false }
+                    .parse(value)
+                    ?.time
+            }.getOrNull()
+        }
+    }
+
+    fun analyzeSavedTicketImage() {
+        val imagePath = savedImagePath ?: return
+        coroutineScope.launch {
+            isAnalyzingTicket = true
+            analysisError = null
+            runCatching {
+                val imageBytes = withContext(Dispatchers.IO) {
+                    context.openFileInput(imagePath).use { input -> input.readBytes() }
+                }
+                val mimeType = selectedUri
+                    ?.let { context.contentResolver.getType(it) }
+                    ?.takeIf { it.startsWith("image/") }
+                    ?: "image/jpeg"
+
+                viewModel.analizarTicketImagen(imageBytes, mimeType)
+            }.onSuccess { analysis ->
+                analysis.storeName?.takeIf { it.isNotBlank() }?.let { supermarket = it }
+                analysis.total?.takeIf { it > 0 }?.let { total = it.toString() }
+                parseAnalyzedDate(analysis.purchaseDate)?.let { dateMillis = it }
+                if (analysis.products.isNotEmpty()) {
+                    ticketProducts.clear()
+                    ticketProducts.addAll(analysis.products)
+                }
+            }.onFailure { error ->
+                analysisError = error.message ?: "No se pudo analizar el ticket."
+            }
+            isAnalyzingTicket = false
+        }
     }
 
     val datePicker = DatePickerDialog(
@@ -892,7 +940,7 @@ fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = n
                             .weight(1f)
                             .height(64.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { galleryLauncher.launch("*/*") }, 
+                            .clickable { galleryLauncher.launch("image/*") },
                         shape = RoundedCornerShape(16.dp),
                         color = if (selectedUri != null) Blue600.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
                         border = BorderStroke(1.dp, if (selectedUri != null) Blue500 else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
@@ -909,6 +957,44 @@ fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = n
                             }
                         }
                     }
+                }
+
+                if (savedImagePath != null) {
+                    Button(
+                        onClick = ::analyzeSavedTicketImage,
+                        enabled = !isAnalyzingTicket,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Blue600,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        if (isAnalyzingTicket) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            if (isAnalyzingTicket) "ANALIZANDO..." else "ANALIZAR CON IA",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                analysisError?.let { error ->
+                    Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
                 
                 // Preview
