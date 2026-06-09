@@ -10,15 +10,34 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.net.URL
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    private const val BASE_URL = "https://tecnologias-moviles-backend.onrender.com/"
     private val JSON_MEDIA_TYPE = "application/json".toMediaType()
     private val gson = Gson()
 
     private var apiService: ApiService? = null
+    
+    // Interceptor para cambiar la URL base dinámicamente
+    private val dynamicBaseUrlInterceptor = object : okhttp3.Interceptor {
+        override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
+            var request = chain.request()
+            // Si ya tenemos una URL base determinada en ApiConfig, la usamos
+            val baseUrl = ApiConfig.activeBaseUrl 
+            if (baseUrl != null) {
+                val urlObj = URL(baseUrl)
+                val newUrl = request.url.newBuilder()
+                    .scheme(urlObj.protocol)
+                    .host(urlObj.host)
+                    .port(if (urlObj.port != -1) urlObj.port else urlObj.defaultPort)
+                    .build()
+                request = request.newBuilder().url(newUrl).build()
+            }
+            return chain.proceed(request)
+        }
+    }
 
     fun getApiService(): ApiService {
         if (apiService == null) {
@@ -27,6 +46,7 @@ object RetrofitClient {
             }
 
             val client = OkHttpClient.Builder()
+                .addInterceptor(dynamicBaseUrlInterceptor)
                 .addInterceptor { chain ->
                     val original = chain.request()
                     val token = AuthSessionStore.accessToken
@@ -45,8 +65,9 @@ object RetrofitClient {
                     } else {
                         val refreshToken = AuthSessionStore.refreshToken ?: return@authenticator null
                         val json = """{"refreshToken":"$refreshToken"}"""
+                        val baseUrl = ApiConfig.activeBaseUrl ?: "https://tecnologias-moviles-backend.onrender.com/"
                         val refreshRequest = Request.Builder()
-                            .url("${BASE_URL}api/auth/refresh")
+                            .url("${baseUrl}api/auth/refresh")
                             .post(json.toRequestBody(JSON_MEDIA_TYPE))
                             .build()
 
@@ -79,7 +100,7 @@ object RetrofitClient {
                 .build()
 
             val retrofit = Retrofit.Builder()
-                .baseUrl(BASE_URL)
+                .baseUrl("https://tecnologias-moviles-backend.onrender.com/") // Placeholder
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()

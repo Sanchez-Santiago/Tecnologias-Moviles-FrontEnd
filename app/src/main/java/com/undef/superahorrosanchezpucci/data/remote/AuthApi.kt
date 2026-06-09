@@ -8,13 +8,6 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-object ApiConfig {
-    const val BASE_URL = "https://tecnologias-moviles-backend.onrender.com"
-    const val REGISTER_PATH = "/api/auth/register"
-    const val LOGIN_PATH = "/api/auth/login"
-    const val ME_PATH = "/api/users/me"
-}
-
 data class AuthSession(
     val token: String?,
     val refreshToken: String?,
@@ -29,7 +22,7 @@ data class RemoteUser(
 
 class AuthApi(private val context: Context? = null) {
 
-    fun register(name: String, email: String, password: String): AuthSession {
+    suspend fun register(name: String, email: String, password: String): AuthSession {
         val body = JSONObject()
             .put("fullName", name)
             .put("email", email)
@@ -38,7 +31,7 @@ class AuthApi(private val context: Context? = null) {
         return request(ApiConfig.REGISTER_PATH, "POST", body).toAuthSession().also { saveSession(it) }
     }
 
-    fun login(email: String, password: String): AuthSession {
+    suspend fun login(email: String, password: String): AuthSession {
         val body = JSONObject()
             .put("email", email)
             .put("password", password)
@@ -55,17 +48,18 @@ class AuthApi(private val context: Context? = null) {
         return resolvedSession
     }
 
-    fun me(token: String): RemoteUser? {
+    suspend fun me(token: String): RemoteUser? {
         return request(ApiConfig.ME_PATH, "GET", token = token).extractUser()
     }
 
-    private fun request(
+    private suspend fun request(
         path: String,
         method: String,
         body: JSONObject? = null,
         token: String? = null
     ): JSONObject {
-        val connection = (URL("${ApiConfig.BASE_URL}$path").openConnection() as HttpURLConnection)
+        val baseUrl = ApiConfig.getBaseUrl()
+        val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection)
         connection.requestMethod = method
         connection.setRequestProperty("Accept", "application/json")
         connection.connectTimeout = 15_000

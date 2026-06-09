@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.undef.superahorrosanchezpucci.R
 import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
+import com.undef.superahorrosanchezpucci.data.remote.ApiConfig
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald500
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
 import kotlinx.coroutines.delay
@@ -23,7 +24,10 @@ import kotlinx.coroutines.delay
 @Composable
 fun SplashScreen(navController: NavController) {
     LaunchedEffect(Unit) {
-        delay(1500)
+        // Inicializamos la URL base intentando local primero
+        ApiConfig.getBaseUrl()
+        
+        delay(1000)
         if (AuthSessionStore.accessToken != null) {
             navController.navigate("INICIO") {
                 popUpTo("SPLASH") { inclusive = true }
