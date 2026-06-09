@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.undef.superahorrosanchezpucci.data.local.AppDatabase
 import com.undef.superahorrosanchezpucci.data.local.CatalogoProductoEntity
+import com.undef.superahorrosanchezpucci.data.local.PresupuestoEntity
 import com.undef.superahorrosanchezpucci.data.local.TiendaEntity
 import com.undef.superahorrosanchezpucci.data.local.toEntity as ticketToEntity
 import com.undef.superahorrosanchezpucci.data.local.toModel as entityToModel
@@ -226,7 +227,16 @@ class AppRepository(private val application: Application) {
                         hora = "",
                         supermercado = compra.supermercado,
                         total = compra.total,
-                        productos = productos.toMutableList()
+                        productos = productos.map { tp ->
+                            Producto(
+                                id = "${compra.id}-${tp.nombre}",
+                                nombre = tp.nombre,
+                                precioReal = tp.precio,
+                                precio = tp.precio,
+                                cantidad = tp.cantidad,
+                                comprado = true
+                            )
+                        }.toMutableList()
                     )
                 )
             } else {

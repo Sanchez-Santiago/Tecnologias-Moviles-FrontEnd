@@ -128,6 +128,13 @@ class AppStateStore private constructor(application: Application) {
         }
     }
 
+    fun actualizarUsuario(usuario: Usuario) {
+        scope.launch {
+            repository.actualizarUsuario(usuario)
+            refrescar()
+        }
+    }
+
     fun logout() {
         scope.launch {
             repository.logout()

@@ -209,8 +209,9 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
                 initialName = usuarioActual?.nombre ?: "",
                 onClose = { showEditProfile = false },
                 onSave = { newName ->
-                    usuarioActual?.let {
-                        viewModel.actualizarUsuario(it.copy(nombre = newName))
+                    val user = usuarioActual
+                    if (user != null) {
+                        viewModel.actualizarUsuario(user.copy(nombre = newName))
                     }
                     showEditProfile = false
                 }

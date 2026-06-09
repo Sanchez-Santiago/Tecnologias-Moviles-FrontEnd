@@ -28,9 +28,7 @@ import com.undef.superahorrosanchezpucci.ui.screens.estadisticas.EstadisticasScr
 import com.undef.superahorrosanchezpucci.ui.screens.familia.FamilyMembersScreen
 import com.undef.superahorrosanchezpucci.ui.screens.historial.HistorialScreen
 import com.undef.superahorrosanchezpucci.ui.screens.inicio.HomeScreen
-import com.undef.superahorrosanchezpucci.ui.screens.inicio.NewMembers
 import com.undef.superahorrosanchezpucci.ui.screens.lista.ListaScreen
-import com.undef.superahorrosanchezpucci.ui.screens.mapa.Mapa
 import com.undef.superahorrosanchezpucci.ui.screens.notifications.NotificationsScreen
 import com.undef.superahorrosanchezpucci.ui.screens.ofertas.OfertasScreen
 import com.undef.superahorrosanchezpucci.ui.screens.profile.ProfileScreen

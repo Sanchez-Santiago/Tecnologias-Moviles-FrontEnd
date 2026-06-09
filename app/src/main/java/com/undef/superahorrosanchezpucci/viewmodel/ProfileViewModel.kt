@@ -16,6 +16,5 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val usuarioActual: StateFlow<Usuario?> = store.usuarioActual
 
     fun updateThemeMode(mode: ThemeMode) = store.updateThemeMode(mode)
-
-    fun cerrarSesion() = store.cerrarSesion()
+    fun actualizarUsuario(usuario: Usuario) = store.actualizarUsuario(usuario)
 }

@@ -8,10 +8,7 @@ object AuthSessionStore {
     private const val REFRESH_TOKEN = "refresh_token"
 
     var accessToken: String? = null
-        private set
-
     var refreshToken: String? = null
-        private set
 
     fun initialize(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
