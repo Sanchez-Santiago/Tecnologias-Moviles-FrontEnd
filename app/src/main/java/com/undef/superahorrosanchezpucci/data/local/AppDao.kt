@@ -68,6 +68,36 @@ interface AppDao {
     @Query("DELETE FROM usuarios")
     suspend fun clearUsuarios()
 
+    // Catalogo productos
+    @Query("SELECT * FROM catalogo_productos")
+    suspend fun getCatalogoProductos(): List<CatalogoProductoEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCatalogoProductos(items: List<CatalogoProductoEntity>)
+
+    @Query("DELETE FROM catalogo_productos")
+    suspend fun clearCatalogoProductos()
+
+    // Tiendas
+    @Query("SELECT * FROM tiendas")
+    suspend fun getTiendas(): List<TiendaEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTiendas(items: List<TiendaEntity>)
+
+    @Query("DELETE FROM tiendas")
+    suspend fun clearTiendas()
+
+    // Ticket queries for sync
+    @Query("SELECT * FROM tickets WHERE synced = 0")
+    suspend fun getUnsyncedTickets(): List<TicketEntity>
+
+    @Query("UPDATE tickets SET synced = 1 WHERE id = :id")
+    suspend fun markTicketSynced(id: String)
+
+    @Query("SELECT * FROM ticket_productos WHERE ticketId = :ticketId")
+    suspend fun getTicketProductosByTicketId(ticketId: String): List<TicketProductoEntity>
+
     @Transaction
     suspend fun replaceAll(
         presupuestos: List<PresupuestoEntity>,

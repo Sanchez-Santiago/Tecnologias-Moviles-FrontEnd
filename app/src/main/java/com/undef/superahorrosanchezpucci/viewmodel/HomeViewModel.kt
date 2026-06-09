@@ -15,6 +15,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val tickets: StateFlow<List<Ticket>> = store.tickets
     val usuarios: StateFlow<List<Usuario>> = store.usuarios
     val isLoading: StateFlow<Boolean> = store.isLoading
+    val usuarioActual: StateFlow<Usuario?> = store.usuarioActual
 
     fun cambiarPresupuestoActivo(id: String) = store.cambiarPresupuestoActivo(id)
 

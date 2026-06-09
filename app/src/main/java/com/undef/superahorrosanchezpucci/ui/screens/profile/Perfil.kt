@@ -44,7 +44,7 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val members by viewModel.usuarios.collectAsStateWithLifecycle()
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
-    val currentUser = members.firstOrNull { it.rol == RolUsuario.ADMIN } ?: members.firstOrNull()
+    val usuarioActual by viewModel.usuarioActual.collectAsStateWithLifecycle()
     
     val isDark = when (themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -85,8 +85,8 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
                 // User Info Card
                 item {
                     ProfileInfoCard(
-                        name = currentUser?.nombre?.takeIf { it.isNotBlank() } ?: "Usuario",
-                        email = currentUser?.email?.takeIf { it.isNotBlank() } ?: "Sin email",
+                        name = usuarioActual?.nombre ?: "Usuario",
+                        email = usuarioActual?.email ?: "",
                         isDark = isDark,
                         onEdit = { showEditProfile = true }
                     )
@@ -197,12 +197,7 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
                             "Salir de la cuenta", 
                             isDestructive = true,
                             isDark = isDark,
-                            onClick = {
-                                viewModel.cerrarSesion()
-                                navController?.navigate("LOGIN") {
-                                    popUpTo(0) { inclusive = true }
-                                }
-                            }
+                            onClick = { }
                         )
                     }
                 }
@@ -210,7 +205,16 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
         }
         
         if (showEditProfile) {
-            EditProfileModal(onClose = { showEditProfile = false })
+            EditProfileModal(
+                initialName = usuarioActual?.nombre ?: "",
+                onClose = { showEditProfile = false },
+                onSave = { newName ->
+                    usuarioActual?.let {
+                        viewModel.actualizarUsuario(it.copy(nombre = newName))
+                    }
+                    showEditProfile = false
+                }
+            )
         }
     }
 }
@@ -438,7 +442,9 @@ fun SettingsItem(
 }
 
 @Composable
-fun EditProfileModal(onClose: () -> Unit) {
+fun EditProfileModal(initialName: String, onClose: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(initialName) }
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -458,25 +464,28 @@ fun EditProfileModal(onClose: () -> Unit) {
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 OutlinedTextField(
-                    value = "Santiago",
-                    onValueChange = {},
-                    label = { Text("Nombre") },
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre", color = Slate400) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = White,
                         unfocusedTextColor = White,
-                        focusedBorderColor = Emerald500
+                        focusedBorderColor = Emerald500,
+                        unfocusedBorderColor = Slate700,
+                        cursorColor = Emerald500
                     )
                 )
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 Button(
-                    onClick = onClose,
+                    onClick = { onSave(name) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("GUARDAR CAMBIOS")
+                    Text("GUARDAR CAMBIOS", fontWeight = FontWeight.Bold)
                 }
             }
         }

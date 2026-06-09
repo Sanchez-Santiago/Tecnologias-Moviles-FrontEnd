@@ -1,0 +1,95 @@
+package com.undef.superahorrosanchezpucci.data.remote
+
+import com.undef.superahorrosanchezpucci.data.remote.dto.ApiResponse
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
+
+object RetrofitClient {
+
+    private const val BASE_URL = "https://tecnologias-moviles-backend.onrender.com/"
+    private val JSON_MEDIA_TYPE = "application/json".toMediaType()
+    private val gson = Gson()
+
+    private var apiService: ApiService? = null
+
+    fun getApiService(): ApiService {
+        if (apiService == null) {
+            val logging = HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+
+            val client = OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    val original = chain.request()
+                    val token = AuthSessionStore.accessToken
+                    if (token.isNullOrBlank()) {
+                        chain.proceed(original)
+                    } else {
+                        chain.proceed(original.newBuilder()
+                            .header("Authorization", "Bearer $token")
+                            .build())
+                    }
+                }
+                .addInterceptor(logging)
+                .authenticator { _, response ->
+                    if (response.request.url.encodedPath.contains("/auth/refresh")) {
+                        null
+                    } else {
+                        val refreshToken = AuthSessionStore.refreshToken ?: return@authenticator null
+                        val json = """{"refreshToken":"$refreshToken"}"""
+                        val refreshRequest = Request.Builder()
+                            .url("${BASE_URL}api/auth/refresh")
+                            .post(json.toRequestBody(JSON_MEDIA_TYPE))
+                            .build()
+
+                        val refreshResponse = OkHttpClient().newCall(refreshRequest).execute()
+                        if (!refreshResponse.isSuccessful) null
+                        else {
+                            val bodyStr = refreshResponse.body?.string() ?: return@authenticator null
+                            try {
+                                val type = object : TypeToken<ApiResponse<Map<String, Any>>>() {}.type
+                                val apiResp: ApiResponse<Map<String, Any>> = gson.fromJson(bodyStr, type)
+                                if (apiResp.success != true || apiResp.data == null) null
+                                else {
+                                    val newAccess = apiResp.data["accessToken"] as? String ?: return@authenticator null
+                                    val newRefresh = apiResp.data["refreshToken"] as? String ?: return@authenticator null
+                                    AuthSessionStore.accessToken = newAccess
+                                    AuthSessionStore.refreshToken = newRefresh
+                                    response.request.newBuilder()
+                                        .header("Authorization", "Bearer $newAccess")
+                                        .build()
+                                }
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+                    }
+                }
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build()
+
+            val retrofit = Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+
+            apiService = retrofit.create(ApiService::class.java)
+        }
+        return apiService!!
+    }
+
+    fun reset() {
+        apiService = null
+    }
+}

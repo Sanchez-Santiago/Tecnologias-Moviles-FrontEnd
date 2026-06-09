@@ -2,6 +2,7 @@ package com.undef.superahorrosanchezpucci.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Index
 
 @Entity(tableName = "presupuestos")
 data class PresupuestoEntity(
@@ -52,7 +53,11 @@ data class TicketEntity(
     val total: Int,
     val metodoPago: String,
     val imagenPath: String,
-    val presupuestoId: String
+    val presupuestoId: String,
+    val storeId: String? = null,
+    val notes: String? = null,
+    val userId: String? = null,
+    val synced: Boolean = false
 )
 
 @Entity(tableName = "ticket_productos", primaryKeys = ["ticketId", "posicion"])
@@ -77,4 +82,29 @@ data class UsuarioEntity(
 data class AppConfigEntity(
     @PrimaryKey val id: String = "config",
     val themeMode: String
+)
+
+@Entity(tableName = "catalogo_productos")
+data class CatalogoProductoEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val price: Double,
+    val categoryId: String,
+    val categoryName: String,
+    val description: String? = null,
+    val imageUrl: String? = null,
+    val barcode: String? = null,
+    val priority: String,
+    val active: Boolean
+)
+
+@Entity(tableName = "tiendas", indices = [Index(value = ["name"], unique = true)])
+data class TiendaEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val address: String? = null,
+    val phone: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val active: Boolean
 )

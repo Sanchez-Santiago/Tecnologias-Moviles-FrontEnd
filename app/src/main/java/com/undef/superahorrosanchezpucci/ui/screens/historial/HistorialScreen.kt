@@ -12,23 +12,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.undef.superahorrosanchezpucci.R
+import com.undef.superahorrosanchezpucci.data.model.Ticket
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
-
-data class CompraMock(
-    val id: String,
-    val fecha: String,
-    val supermercado: String,
-    val total: Int
-)
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
-fun HistorialScreen(navController: NavController) {
-    val comprasMock = listOf(
-        CompraMock("1", "15/05/2026", "Supermercado Ejemplo", 15000),
-        CompraMock("2", "10/05/2026", "Mercado Central", 22000),
-        CompraMock("3", "05/05/2026", "HiperMax", 18500),
-        CompraMock("4", "01/05/2026", "Supermercado Ejemplo", 12000)
-    )
+fun HistorialScreen(navController: NavController, compras: List<Ticket>) {
+    val sortedCompras = compras.sortedByDescending { it.fechaHora }
 
     Column(
         modifier = Modifier
@@ -43,25 +34,42 @@ fun HistorialScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(comprasMock) { compra ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { navController.navigate("DETALLE_COMPRA/${compra.id}") }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+        if (compras.isEmpty()) {
+            Text(
+                text = "No hay compras registradas",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Gray
+            )
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(sortedCompras) { compra ->
+                    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { navController.navigate("DETALLE_COMPRA/${compra.id}") }
                     ) {
-                        Column {
-                            Text(compra.supermercado, fontWeight = FontWeight.Medium)
-                            Text(compra.fecha, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(compra.supermercado, fontWeight = FontWeight.Medium)
+                                Text(
+                                    dateFormat.format(Date(compra.fechaHora)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                            }
+                            Text(
+                                "$${compra.total}",
+                                fontWeight = FontWeight.Bold,
+                                color = Emerald700
+                            )
                         }
-                        Text("$${compra.total}", fontWeight = FontWeight.Bold, color = Emerald700)
                     }
                 }
             }

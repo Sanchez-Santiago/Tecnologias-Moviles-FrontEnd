@@ -13,9 +13,11 @@ import androidx.room.RoomDatabase
         TicketEntity::class,
         TicketProductoEntity::class,
         UsuarioEntity::class,
-        AppConfigEntity::class
+        AppConfigEntity::class,
+        CatalogoProductoEntity::class,
+        TiendaEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,7 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "super_ahorro.db"
-                ).build().also { instance = it }
+                ).fallbackToDestructiveMigration().build().also { instance = it }
             }
         }
     }

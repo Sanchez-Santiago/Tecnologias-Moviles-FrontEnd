@@ -5,20 +5,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.*
 import com.undef.superahorrosanchezpucci.ui.screens.auth.LoginScreen
@@ -29,7 +28,9 @@ import com.undef.superahorrosanchezpucci.ui.screens.estadisticas.EstadisticasScr
 import com.undef.superahorrosanchezpucci.ui.screens.familia.FamilyMembersScreen
 import com.undef.superahorrosanchezpucci.ui.screens.historial.HistorialScreen
 import com.undef.superahorrosanchezpucci.ui.screens.inicio.HomeScreen
+import com.undef.superahorrosanchezpucci.ui.screens.inicio.NewMembers
 import com.undef.superahorrosanchezpucci.ui.screens.lista.ListaScreen
+import com.undef.superahorrosanchezpucci.ui.screens.mapa.Mapa
 import com.undef.superahorrosanchezpucci.ui.screens.notifications.NotificationsScreen
 import com.undef.superahorrosanchezpucci.ui.screens.ofertas.OfertasScreen
 import com.undef.superahorrosanchezpucci.ui.screens.profile.ProfileScreen
@@ -37,14 +38,10 @@ import com.undef.superahorrosanchezpucci.ui.screens.settings.SettingsScreen
 import com.undef.superahorrosanchezpucci.ui.screens.splash.SplashScreen
 import com.undef.superahorrosanchezpucci.ui.screens.tickets.TicketsScreen
 import com.undef.superahorrosanchezpucci.ui.theme.*
-
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.viewmodel.FamilyViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.HomeViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ListaViewModel
-import com.undef.superahorrosanchezpucci.viewmodel.OfertasViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ProfileViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ThemeViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.TicketsViewModel
@@ -64,7 +61,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
@@ -72,6 +68,9 @@ fun MainScreen() {
     val currentRoute = navBackStackEntry?.destination?.route
 
     val showBottomBar = currentRoute in listOf("INICIO", "LISTA", "TICKETS", "OFERTAS", "PERFIL")
+
+    val ticketsViewModel: TicketsViewModel = viewModel()
+    val ticketsState by ticketsViewModel.tickets.collectAsStateWithLifecycle()
 
     Scaffold(
         bottomBar = {
@@ -103,18 +102,15 @@ fun MainScreen() {
             composable("NUEVA_COMPRA") { NuevaCompraScreen(navController) }
             composable("DETALLE_COMPRA/{compraId}") { backStackEntry ->
                 val compraId = backStackEntry.arguments?.getString("compraId") ?: ""
-                DetalleCompraScreen(navController, compraId)
+                val compra = ticketsState.find { it.id == compraId }
+                DetalleCompraScreen(navController, compra)
             }
-            composable("HISTORIAL") { HistorialScreen(navController) }
+            composable("HISTORIAL") {
+                HistorialScreen(navController, ticketsState)
+            }
             composable("ESTADISTICAS") { EstadisticasScreen(navController) }
-            composable("TICKETS") {
-                val ticketsViewModel: TicketsViewModel = viewModel()
-                TicketsScreen(ticketsViewModel)
-            }
-            composable("OFERTAS") {
-                val ofertasViewModel: OfertasViewModel = viewModel()
-                OfertasScreen(ofertasViewModel)
-            }
+            composable("TICKETS") { TicketsScreen(ticketsViewModel) }
+            composable("OFERTAS") { OfertasScreen() }
             composable("PERFIL") {
                 val profileViewModel: ProfileViewModel = viewModel()
                 ProfileScreen(profileViewModel, navController)
@@ -123,8 +119,6 @@ fun MainScreen() {
                 val themeViewModel: ThemeViewModel = viewModel()
                 SettingsScreen(navController, themeViewModel)
             }
-
-            // Sub-pantallas
             composable("NOTIFICACIONES") { NotificationsScreen() }
             composable("FAMILIA") {
                 val familyViewModel: FamilyViewModel = viewModel()

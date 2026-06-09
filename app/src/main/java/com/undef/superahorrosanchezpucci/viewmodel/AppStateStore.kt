@@ -6,7 +6,6 @@ import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Producto
 import com.undef.superahorrosanchezpucci.data.model.Ticket
-import com.undef.superahorrosanchezpucci.data.model.TicketImageAnalysis
 import com.undef.superahorrosanchezpucci.data.model.Usuario
 import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.data.repository.AppRepository
@@ -21,9 +20,8 @@ import kotlinx.coroutines.launch
 
 class AppStateStore private constructor(application: Application) {
 
-    private val appContext = application.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val repository = AppRepository(appContext)
+    private val repository = AppRepository(application)
 
     private val _presupuestos = MutableStateFlow<List<Presupuesto>>(emptyList())
     val presupuestos: StateFlow<List<Presupuesto>> = _presupuestos.asStateFlow()
@@ -36,6 +34,9 @@ class AppStateStore private constructor(application: Application) {
 
     private val _usuarios = MutableStateFlow<List<Usuario>>(emptyList())
     val usuarios: StateFlow<List<Usuario>> = _usuarios.asStateFlow()
+
+    private val _usuarioActual = MutableStateFlow<Usuario?>(null)
+    val usuarioActual: StateFlow<Usuario?> = _usuarioActual.asStateFlow()
 
     private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
@@ -120,10 +121,6 @@ class AppStateStore private constructor(application: Application) {
         }
     }
 
-    suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
-        return repository.analizarTicketImagen(imageBytes, mimeType)
-    }
-
     fun agregarUsuario(usuario: Usuario) {
         scope.launch {
             repository.agregarUsuario(usuario)
@@ -131,18 +128,21 @@ class AppStateStore private constructor(application: Application) {
         }
     }
 
+    fun logout() {
+        scope.launch {
+            repository.logout()
+            _presupuestos.value = emptyList()
+            _listas.value = emptyList()
+            _tickets.value = emptyList()
+            _usuarios.value = emptyList()
+            _usuarioActual.value = null
+        }
+    }
+
     fun updateThemeMode(mode: ThemeMode) {
         _themeMode.value = mode
         scope.launch {
             repository.updateThemeMode(mode)
-        }
-    }
-
-    fun cerrarSesion() {
-        AuthSessionStore.clear(appContext)
-        scope.launch {
-            repository.cerrarSesion()
-            refrescar()
         }
     }
 
@@ -160,6 +160,7 @@ class AppStateStore private constructor(application: Application) {
         _listas.value = repository.listas.toList()
         _tickets.value = repository.tickets.toList()
         _usuarios.value = repository.usuarios.toList()
+        _usuarioActual.value = repository.usuarioActual
     }
 
     companion object {

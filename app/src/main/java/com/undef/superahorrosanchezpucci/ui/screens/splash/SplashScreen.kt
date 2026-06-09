@@ -3,7 +3,6 @@ package com.undef.superahorrosanchezpucci.ui.screens.splash
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,10 +23,15 @@ import kotlinx.coroutines.delay
 @Composable
 fun SplashScreen(navController: NavController) {
     LaunchedEffect(Unit) {
-        delay(2500)
-        val destination = if (AuthSessionStore.accessToken.isNullOrBlank()) "LOGIN" else "INICIO"
-        navController.navigate(destination) {
-            popUpTo("SPLASH") { inclusive = true }
+        delay(1500)
+        if (AuthSessionStore.accessToken != null) {
+            navController.navigate("INICIO") {
+                popUpTo("SPLASH") { inclusive = true }
+            }
+        } else {
+            navController.navigate("LOGIN") {
+                popUpTo("SPLASH") { inclusive = true }
+            }
         }
     }
 

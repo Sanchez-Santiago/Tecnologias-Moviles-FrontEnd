@@ -13,6 +13,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val themeMode: StateFlow<ThemeMode> = store.themeMode
     val usuarios: StateFlow<List<Usuario>> = store.usuarios
     val presupuestos: StateFlow<List<Presupuesto>> = store.presupuestos
+    val usuarioActual: StateFlow<Usuario?> = store.usuarioActual
 
     fun updateThemeMode(mode: ThemeMode) = store.updateThemeMode(mode)
 

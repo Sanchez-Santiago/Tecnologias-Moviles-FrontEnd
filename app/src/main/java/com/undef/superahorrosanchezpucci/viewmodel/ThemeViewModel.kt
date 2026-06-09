@@ -12,5 +12,5 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateThemeMode(mode: ThemeMode) = store.updateThemeMode(mode)
 
-    fun cerrarSesion() = store.cerrarSesion()
+    fun logout() = store.logout()
 }

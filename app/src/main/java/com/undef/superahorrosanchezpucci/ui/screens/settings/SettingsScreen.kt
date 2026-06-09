@@ -12,14 +12,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.undef.superahorrosanchezpucci.R
-import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
+import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
 import com.undef.superahorrosanchezpucci.viewmodel.ThemeViewModel
 
 @Composable
 fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
     var notificaciones by remember { mutableStateOf(true) }
     var sincronizacion by remember { mutableStateOf(false) }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
 
     Column(
@@ -52,7 +53,7 @@ fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
                         checked = themeMode == ThemeMode.DARK,
                         onCheckedChange = { enabled ->
                             viewModel.updateThemeMode(
-                                if (enabled) ThemeMode.DARK 
+                                if (enabled) ThemeMode.DARK
                                 else ThemeMode.LIGHT
                             )
                         }
@@ -108,12 +109,7 @@ fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = {
-                        viewModel.cerrarSesion()
-                        navController.navigate("LOGIN") {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    },
+                    onClick = { showLogoutConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -125,10 +121,36 @@ fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
         Spacer(modifier = Modifier.weight(1f))
 
         Text(
-            text = stringResource(R.string.app_version_label),
+            text = "Super Ahorro v2.0",
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray,
             modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+    }
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("Cerrar Sesión") },
+            text = { Text("¿Estás seguro de que deseas cerrar sesión?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutConfirm = false
+                        viewModel.logout()
+                        navController.navigate("LOGIN") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Sí, cerrar sesión", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
         )
     }
 }

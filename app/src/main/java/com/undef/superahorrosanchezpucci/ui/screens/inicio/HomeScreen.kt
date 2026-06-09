@@ -27,8 +27,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.undef.superahorrosanchezpucci.R
 import com.undef.superahorrosanchezpucci.data.model.Categoria
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
-import com.undef.superahorrosanchezpucci.data.model.RolUsuario
-import com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto
 import com.undef.superahorrosanchezpucci.data.model.Usuario
 import com.undef.superahorrosanchezpucci.ui.components.HomeSkeleton
 import com.undef.superahorrosanchezpucci.ui.theme.*
@@ -46,12 +44,9 @@ fun HomeScreen(
     val allTickets by viewModel.tickets.collectAsStateWithLifecycle()
     val usuarios by viewModel.usuarios.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val usuarioActual by viewModel.usuarioActual.collectAsStateWithLifecycle()
 
     val presupuestoActivo = presupuestos.find { it.activo }
-    val familiarPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.FAMILIAR }?.id
-        ?: "presupuesto-familiar"
-    val individualPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.INDIVIDUAL }?.id
-        ?: "presupuesto-individual"
     val tickets = allTickets
         .filter { it.presupuestoId == presupuestoActivo?.id }
         .sortedByDescending { it.fechaHora }
@@ -69,13 +64,7 @@ fun HomeScreen(
     }.value
 
     Scaffold(
-        topBar = {
-            Header(
-                onNotificationsClick = onNavigateToNotifications,
-                isCritical = isCritical,
-                currentUser = usuarios.firstOrNull { it.rol == RolUsuario.ADMIN } ?: usuarios.firstOrNull()
-            )
-        },
+        topBar = { Header(usuarioActual?.nombre ?: "Usuario", onNavigateToNotifications, isCritical) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (isLoading) {
@@ -94,15 +83,13 @@ fun HomeScreen(
                 item { 
                     ModeSelector(
                         activeId = presupuestoActivo?.id ?: "",
-                        individualId = individualPresupuestoId,
-                        familiarId = familiarPresupuestoId,
                         onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
                     ) 
                 }
 
                 item { 
                     presupuestoActivo?.let { presupuesto ->
-                        val listaId = if (presupuesto.tipo == TipoPresupuesto.FAMILIAR) "lista-familiar" else "lista-individual"
+                        val listaId = if (presupuesto.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
                         val estimados = viewModel.getEstimadosPorCategoria(listaId)
                         
                         BudgetHero(
@@ -164,28 +151,24 @@ fun formatPrice(amount: Int): String {
 }
 
 @Composable
-fun Header(
-    onNotificationsClick: () -> Unit,
-    isCritical: Boolean = false,
-    currentUser: Usuario? = null
-) {
-    val headerColor = if (isCritical) {
-        Brush.horizontalGradient(listOf(Amber500.copy(alpha = 0.2f), Rose500.copy(alpha = 0.2f)))
+fun Header(userName: String, onNotificationsClick: () -> Unit, isCritical: Boolean = false) {
+    val headerBrush = if (isCritical) {
+        Brush.horizontalGradient(listOf(Amber500.copy(alpha = 0.15f), Rose500.copy(alpha = 0.15f)))
     } else {
-        Brush.linearGradient(listOf(MaterialTheme.colorScheme.background.copy(alpha = 0.9f), MaterialTheme.colorScheme.background.copy(alpha = 0.9f)))
+        null
     }
     
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.Transparent,
-        border = BorderStroke(1.dp, if (isCritical) Rose500.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline)
+        color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+        border = BorderStroke(1.dp, if (isCritical) Rose500.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     ) {
         Row(
             modifier = Modifier
                 .statusBarsPadding()
-                .height(88.dp)
-                .padding(horizontal = 24.dp)
-                .background(headerColor),
+                .then(if (headerBrush != null) Modifier.background(headerBrush) else Modifier)
+                .height(80.dp)
+                .padding(horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -195,14 +178,15 @@ fun Header(
                     style = MaterialTheme.typography.titleLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
+                        fontSize = 22.sp,
+                        letterSpacing = 1.sp
                     )
                 )
                 Text(
-                    text = "Hola, ${currentUser?.nombre?.takeIf { it.isNotBlank() } ?: "Usuario"}",
+                    text = "Hola, $userName",
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
                 )
@@ -215,7 +199,7 @@ fun Header(
                         modifier = Modifier
                             .size(40.dp)
                             .background(MaterialTheme.colorScheme.surface, CircleShape)
-                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), CircleShape)
                     ) {
                         Icon(
                             Icons.Default.Notifications,
@@ -238,12 +222,17 @@ fun Header(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(
+                        Icons.Default.Person, 
+                        contentDescription = null, 
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
@@ -251,12 +240,7 @@ fun Header(
 }
 
 @Composable
-fun ModeSelector(
-    activeId: String,
-    onModeChange: (String) -> Unit,
-    individualId: String = "presupuesto-individual",
-    familiarId: String = "presupuesto-familiar"
-) {
+fun ModeSelector(activeId: String, onModeChange: (String) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -266,17 +250,17 @@ fun ModeSelector(
             .padding(6.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            val isIndividual = activeId == individualId
+            val isIndividual = activeId == "presupuesto-individual"
             SelectorItem(
                 text = "INDIVIDUAL",
                 isSelected = isIndividual,
-                onClick = { onModeChange(individualId) },
+                onClick = { onModeChange("presupuesto-individual") },
                 modifier = Modifier.weight(1f)
             )
             SelectorItem(
                 text = "FAMILIAR",
                 isSelected = !isIndividual,
-                onClick = { onModeChange(familiarId) },
+                onClick = { onModeChange("presupuesto-familiar") },
                 modifier = Modifier.weight(1f)
             )
         }
