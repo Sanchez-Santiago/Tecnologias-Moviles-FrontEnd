@@ -181,23 +181,26 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
                             }
                         )
                         SettingsItem(
-                            Icons.Default.Help, 
-                            "Ayuda y Soporte", 
+                            Icons.Default.Help,
+                            "Ayuda y Soporte",
                             "Centro de asistencia",
                             isDark = isDark,
-                            onClick = { 
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Próximamente")
-                                }
-                            }
+                            onClick = { }
                         )
                         SettingsItem(
-                            Icons.Default.Logout, 
-                            "Cerrar Sesión", 
-                            "Salir de la cuenta", 
+                            Icons.Default.Logout,
+                            "Cerrar Sesión",
+                            "Salir de la cuenta",
                             isDestructive = true,
                             isDark = isDark,
-                            onClick = { }
+                            onClick = {
+                                scope.launch {
+                                    viewModel.logout()
+                                    navController?.navigate("LOGIN") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
+                            }
                         )
                     }
                 }

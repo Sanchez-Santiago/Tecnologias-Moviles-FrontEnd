@@ -11,21 +11,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.undef.superahorrosanchezpucci.R
-import com.undef.superahorrosanchezpucci.data.remote.AuthApi
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
-import com.undef.superahorrosanchezpucci.viewmodel.AppStateStore
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.undef.superahorrosanchezpucci.viewmodel.AuthViewModel
 
 @Composable
 fun LoginScreen(navController: NavController) {
@@ -33,9 +28,7 @@ fun LoginScreen(navController: NavController) {
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
-    val authApi = remember { AuthApi(context.applicationContext) }
-    val scope = rememberCoroutineScope()
+    val authViewModel: AuthViewModel = viewModel()
 
     Column(
         modifier = Modifier
@@ -45,7 +38,6 @@ fun LoginScreen(navController: NavController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo o Icono de la App
         Box(
             modifier = Modifier
                 .size(100.dp)
@@ -60,44 +52,25 @@ fun LoginScreen(navController: NavController) {
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = stringResource(R.string.splash_title),
-            fontSize = 32.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Emerald700,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "¡Ahorrá en cada compra!",
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = stringResource(R.string.login_title),
-            fontSize = 22.sp,
+            text = stringResource(R.string.app_name),
+            fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            color = Emerald700
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text(stringResource(R.string.email_hint), fontWeight = FontWeight.Medium) },
+            label = { Text(stringResource(R.string.email_hint)) },
+            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Emerald700) },
-            shape = RoundedCornerShape(12.dp),
-            singleLine = true
+            shape = RoundedCornerShape(12.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -105,18 +78,18 @@ fun LoginScreen(navController: NavController) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text(stringResource(R.string.password_hint), fontWeight = FontWeight.Medium) },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Emerald700) },
-            shape = RoundedCornerShape(12.dp),
+            label = { Text(stringResource(R.string.password_hint)) },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+            singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
-            singleLine = true
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
         )
 
-        errorMessage?.let { message ->
-            Spacer(modifier = Modifier.height(12.dp))
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = message,
+                text = errorMessage!!,
                 color = MaterialTheme.colorScheme.error,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
@@ -128,31 +101,21 @@ fun LoginScreen(navController: NavController) {
         Button(
             onClick = {
                 errorMessage = null
-
                 if (email.isBlank() || password.isBlank()) {
                     errorMessage = "Completá email y contraseña."
                     return@Button
                 }
 
-                scope.launch {
-                    isLoading = true
-                    val result = runCatching {
-                        withContext(Dispatchers.IO) {
-                            authApi.login(email.trim(), password)
-                        }
-                    }
+                isLoading = true
+                authViewModel.login(email.trim(), password) { result ->
                     isLoading = false
-
-                    result
-                        .onSuccess {
-                            AppStateStore.get(context.applicationContext as android.app.Application).reload()
-                            navController.navigate("INICIO") {
-                                popUpTo("LOGIN") { inclusive = true }
-                            }
+                    result.onSuccess {
+                        navController.navigate("INICIO") {
+                            popUpTo("LOGIN") { inclusive = true }
                         }
-                        .onFailure { error ->
-                            errorMessage = error.message ?: "No se pudo iniciar sesión."
-                        }
+                    }.onFailure { error ->
+                        errorMessage = error.message ?: "No se pudo iniciar sesión."
+                    }
                 }
             },
             enabled = !isLoading,
@@ -191,8 +154,8 @@ fun LoginScreen(navController: NavController) {
                 onClick = { navController.navigate("REGISTER") }
             ) {
                 Text(
-                    text = "Registrate", 
-                    color = Emerald700, 
+                    text = "Registrate",
+                    color = Emerald700,
                     fontWeight = FontWeight.Bold
                 )
             }

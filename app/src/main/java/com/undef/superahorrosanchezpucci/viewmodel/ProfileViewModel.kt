@@ -17,4 +17,5 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateThemeMode(mode: ThemeMode) = store.updateThemeMode(mode)
     fun actualizarUsuario(usuario: Usuario) = store.actualizarUsuario(usuario)
+    fun logout() = store.logout()
 }

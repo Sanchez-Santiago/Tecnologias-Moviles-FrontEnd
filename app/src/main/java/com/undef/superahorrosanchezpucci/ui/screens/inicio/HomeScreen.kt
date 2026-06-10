@@ -83,13 +83,14 @@ fun HomeScreen(
                 item { 
                     ModeSelector(
                         activeId = presupuestoActivo?.id ?: "",
+                        presupuestos = presupuestos,
                         onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
                     ) 
                 }
 
                 item { 
                     presupuestoActivo?.let { presupuesto ->
-                        val listaId = if (presupuesto.id == "presupuesto-familiar") "lista-familiar" else "lista-individual"
+                        val listaId = if (presupuesto.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR) "lista-familiar" else "lista-individual"
                         val estimados = viewModel.getEstimadosPorCategoria(listaId)
                         
                         BudgetHero(
@@ -240,7 +241,10 @@ fun Header(userName: String, onNotificationsClick: () -> Unit, isCritical: Boole
 }
 
 @Composable
-fun ModeSelector(activeId: String, onModeChange: (String) -> Unit) {
+fun ModeSelector(activeId: String, presupuestos: List<Presupuesto>, onModeChange: (String) -> Unit) {
+    val familiarId = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR }?.id ?: "presupuesto-familiar"
+    val individualId = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.INDIVIDUAL }?.id ?: "presupuesto-individual"
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -250,17 +254,17 @@ fun ModeSelector(activeId: String, onModeChange: (String) -> Unit) {
             .padding(6.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            val isIndividual = activeId == "presupuesto-individual"
+            val isIndividual = activeId == individualId
             SelectorItem(
                 text = "INDIVIDUAL",
                 isSelected = isIndividual,
-                onClick = { onModeChange("presupuesto-individual") },
+                onClick = { onModeChange(individualId) },
                 modifier = Modifier.weight(1f)
             )
             SelectorItem(
                 text = "FAMILIAR",
                 isSelected = !isIndividual,
-                onClick = { onModeChange("presupuesto-familiar") },
+                onClick = { onModeChange(familiarId) },
                 modifier = Modifier.weight(1f)
             )
         }

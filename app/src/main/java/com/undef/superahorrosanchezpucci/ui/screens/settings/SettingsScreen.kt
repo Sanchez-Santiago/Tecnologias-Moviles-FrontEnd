@@ -20,7 +20,6 @@ import com.undef.superahorrosanchezpucci.viewmodel.ThemeViewModel
 fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
     var notificaciones by remember { mutableStateOf(true) }
     var sincronizacion by remember { mutableStateOf(false) }
-    var showLogoutConfirm by remember { mutableStateOf(false) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
 
     Column(
@@ -99,25 +98,6 @@ fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(R.string.account_title), fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = { showLogoutConfirm = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text(stringResource(R.string.logout_button))
-                }
-            }
-        }
-
         Spacer(modifier = Modifier.weight(1f))
 
         Text(
@@ -125,32 +105,6 @@ fun SettingsScreen(navController: NavController, viewModel: ThemeViewModel) {
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray,
             modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-    }
-
-    if (showLogoutConfirm) {
-        AlertDialog(
-            onDismissRequest = { showLogoutConfirm = false },
-            title = { Text("Cerrar Sesión") },
-            text = { Text("¿Estás seguro de que deseas cerrar sesión?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showLogoutConfirm = false
-                        viewModel.logout()
-                        navController.navigate("LOGIN") {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
-                ) {
-                    Text("Sí, cerrar sesión", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutConfirm = false }) {
-                    Text("Cancelar")
-                }
-            }
         )
     }
 }

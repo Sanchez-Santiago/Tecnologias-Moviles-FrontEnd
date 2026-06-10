@@ -6,6 +6,7 @@ import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Producto
 import com.undef.superahorrosanchezpucci.data.model.Ticket
+import com.undef.superahorrosanchezpucci.data.model.TicketImageAnalysis
 import com.undef.superahorrosanchezpucci.data.model.Usuario
 import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.data.repository.AppRepository
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AppStateStore private constructor(application: Application) {
 
@@ -56,6 +58,21 @@ class AppStateStore private constructor(application: Application) {
             refrescar()
             _themeMode.value = repository.themeMode
             _isLoading.value = false
+        }
+    }
+
+    fun login(email: String, password: String, onResult: (Result<Usuario>) -> Unit) {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { repository.login(email, password) }
+            result.onSuccess { refrescar() }
+            onResult(result)
+        }
+    }
+
+    fun register(name: String, email: String, password: String, onResult: (Result<Unit>) -> Unit) {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { repository.register(name, email, password) }
+            onResult(result)
         }
     }
 
@@ -135,6 +152,14 @@ class AppStateStore private constructor(application: Application) {
         }
     }
 
+    fun invitarMiembro(email: String) {
+        scope.launch {
+            val grupoId = repository.grupos.firstOrNull()?.id ?: return@launch
+            repository.inviteMember(grupoId, email)
+            refrescar()
+        }
+    }
+
     fun logout() {
         scope.launch {
             repository.logout()
@@ -151,6 +176,10 @@ class AppStateStore private constructor(application: Application) {
         scope.launch {
             repository.updateThemeMode(mode)
         }
+    }
+
+    suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
+        return repository.analizarTicketImagen(imageBytes, mimeType)
     }
 
     fun getEstimadosPorCategoria(listaId: String): Map<Categoria, Int> {

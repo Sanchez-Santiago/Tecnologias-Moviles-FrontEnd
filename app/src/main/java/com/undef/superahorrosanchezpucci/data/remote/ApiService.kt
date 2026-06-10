@@ -30,6 +30,9 @@ interface ApiService {
     @GET("api/stores")
     suspend fun getStores(): Response<ApiResponse<List<StoreResponse>>>
 
+    @GET("api/categories")
+    suspend fun getCategories(): Response<ApiResponse<List<CategoryResponse>>>
+
     @GET("api/products")
     suspend fun getProducts(@Query("categoryId") categoryId: String? = null): Response<ApiResponse<List<ProductResponse>>>
 

@@ -45,7 +45,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.undef.superahorrosanchezpucci.data.model.MetodoPago
 import com.undef.superahorrosanchezpucci.data.model.Ticket
 import com.undef.superahorrosanchezpucci.data.model.TicketProducto
-import com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto
 import com.undef.superahorrosanchezpucci.ui.components.TicketsSkeleton
 import com.undef.superahorrosanchezpucci.ui.screens.inicio.ModeSelector
 import com.undef.superahorrosanchezpucci.ui.theme.*
@@ -69,10 +68,6 @@ fun TicketsScreen(viewModel: TicketsViewModel) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     
     val presupuestoActivo = presupuestos.find { it.activo }
-    val familiarPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.FAMILIAR }?.id
-        ?: "presupuesto-familiar"
-    val individualPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.INDIVIDUAL }?.id
-        ?: "presupuesto-individual"
     val tickets = allTickets.filter { it.presupuestoId == presupuestoActivo?.id }
 
     val filteredTickets = tickets.filter { ticket ->
@@ -92,8 +87,7 @@ fun TicketsScreen(viewModel: TicketsViewModel) {
                     Box(modifier = Modifier.padding(horizontal = 24.dp)) {
                         ModeSelector(
                             activeId = presupuestoActivo?.id ?: "",
-                            individualId = individualPresupuestoId,
-                            familiarId = familiarPresupuestoId,
+                            presupuestos = presupuestos,
                             onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
                         )
                     }

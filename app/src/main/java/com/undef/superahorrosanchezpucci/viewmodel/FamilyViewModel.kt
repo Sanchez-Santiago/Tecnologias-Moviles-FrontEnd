@@ -11,4 +11,6 @@ class FamilyViewModel(application: Application) : AndroidViewModel(application) 
     val usuarios: StateFlow<List<Usuario>> = store.usuarios
 
     fun agregarUsuario(usuario: Usuario) = store.agregarUsuario(usuario)
+
+    fun invitarMiembro(email: String) = store.invitarMiembro(email)
 }

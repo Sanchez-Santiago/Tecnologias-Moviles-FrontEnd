@@ -51,10 +51,6 @@ fun ListaScreen(viewModel: ListaViewModel) {
     val presupuestoActivo = presupuestos.find { it.activo }
     val isFamiliar = presupuestoActivo?.tipo != TipoPresupuesto.INDIVIDUAL
     val listaActualId = if (isFamiliar) "lista-familiar" else "lista-individual"
-    val familiarPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.FAMILIAR }?.id
-        ?: "presupuesto-familiar"
-    val individualPresupuestoId = presupuestos.firstOrNull { it.tipo == TipoPresupuesto.INDIVIDUAL }?.id
-        ?: "presupuesto-individual"
     
     val listaActual = listas.find { it.id == listaActualId }
     val items = listaActual?.productos ?: emptyList<Producto>()
@@ -120,8 +116,7 @@ fun ListaScreen(viewModel: ListaViewModel) {
                         Box(modifier = Modifier.weight(1f)) {
                             ModeSelector(
                                 activeId = presupuestoActivo?.id ?: "",
-                                individualId = individualPresupuestoId,
-                                familiarId = familiarPresupuestoId,
+                                presupuestos = presupuestos,
                                 onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
                             )
                         }

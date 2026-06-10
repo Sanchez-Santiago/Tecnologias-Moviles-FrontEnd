@@ -7,16 +7,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.undef.superahorrosanchezpucci.R
 import com.undef.superahorrosanchezpucci.data.model.RolUsuario
 import com.undef.superahorrosanchezpucci.data.model.Usuario
 import com.undef.superahorrosanchezpucci.ui.theme.*
@@ -25,9 +28,21 @@ import com.undef.superahorrosanchezpucci.viewmodel.FamilyViewModel
 @Composable
 fun FamilyMembersScreen(viewModel: FamilyViewModel, onBack: () -> Unit) {
     val usuarios by viewModel.usuarios.collectAsStateWithLifecycle()
+    var showInviteDialog by remember { mutableStateOf(false) }
+    var inviteEmail by remember { mutableStateOf("") }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showInviteDialog = true },
+                containerColor = Emerald600,
+                contentColor = Color.White,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("INVITAR") },
+                shape = RoundedCornerShape(24.dp)
+            )
+        },
         topBar = {
             Row(
                 modifier = Modifier
@@ -50,6 +65,33 @@ fun FamilyMembersScreen(viewModel: FamilyViewModel, onBack: () -> Unit) {
             }
         }
     ) { padding ->
+        if (showInviteDialog) {
+            AlertDialog(
+                onDismissRequest = { showInviteDialog = false },
+                title = { Text("Invitar Familiar") },
+                text = {
+                    OutlinedTextField(
+                        value = inviteEmail,
+                        onValueChange = { inviteEmail = it },
+                        label = { Text("Email") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (inviteEmail.isNotBlank()) {
+                            viewModel.invitarMiembro(inviteEmail)
+                            inviteEmail = ""
+                            showInviteDialog = false
+                        }
+                    }) { Text("ENVIAR") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showInviteDialog = false }) { Text("CANCELAR") }
+                }
+            )
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

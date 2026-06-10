@@ -1,5 +1,6 @@
 package com.undef.superahorrosanchezpucci.ui.screens.splash
 
+import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
@@ -9,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -19,14 +21,21 @@ import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.data.remote.ApiConfig
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald500
 import com.undef.superahorrosanchezpucci.ui.theme.Emerald700
+import com.undef.superahorrosanchezpucci.viewmodel.AppStateStore
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(navController: NavController) {
+    val context = LocalContext.current
+
     LaunchedEffect(Unit) {
-        // Inicializamos la URL base intentando local primero
         ApiConfig.getBaseUrl()
-        
+
+        if (AuthSessionStore.accessToken != null) {
+            val app = context.applicationContext as Application
+            AppStateStore.get(app)
+        }
+
         delay(1000)
         if (AuthSessionStore.accessToken != null) {
             navController.navigate("INICIO") {
