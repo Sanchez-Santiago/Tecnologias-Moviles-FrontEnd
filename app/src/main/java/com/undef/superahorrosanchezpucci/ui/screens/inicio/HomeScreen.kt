@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,11 +29,13 @@ import com.undef.superahorrosanchezpucci.R
 import com.undef.superahorrosanchezpucci.data.model.Categoria
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Usuario
+import com.undef.superahorrosanchezpucci.data.remote.dto.*
 import com.undef.superahorrosanchezpucci.ui.components.HomeSkeleton
 import com.undef.superahorrosanchezpucci.ui.theme.*
 import com.undef.superahorrosanchezpucci.viewmodel.HomeViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.random.Random
 
 @Composable
 fun HomeScreen(
@@ -43,14 +46,29 @@ fun HomeScreen(
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
     val allTickets by viewModel.tickets.collectAsStateWithLifecycle()
     val usuarios by viewModel.usuarios.collectAsStateWithLifecycle()
+    val grupos by viewModel.grupos.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val usuarioActual by viewModel.usuarioActual.collectAsStateWithLifecycle()
+    val unreadCount by viewModel.unreadCount.collectAsStateWithLifecycle()
+    
+    // Stats for detailed view at bottom
+    val spendingByStore by viewModel.spendingByStore.collectAsStateWithLifecycle()
+    val mostPurchasedProducts by viewModel.mostPurchasedProducts.collectAsStateWithLifecycle()
+    val memberSpending by viewModel.memberSpending.collectAsStateWithLifecycle()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     val presupuestoActivo = presupuestos.find { it.activo }
     val tickets = allTickets
         .filter { it.presupuestoId == presupuestoActivo?.id }
         .sortedByDescending { it.fechaHora }
         .take(3)
+
+    val grupoId = grupos.firstOrNull()?.id
+    LaunchedEffect(grupoId) {
+        grupoId?.let { viewModel.loadStats(it) }
+    }
 
     // Calculate budget warning state
     val isCritical = remember(presupuestoActivo) {
@@ -64,7 +82,8 @@ fun HomeScreen(
     }.value
 
     Scaffold(
-        topBar = { Header(usuarioActual?.nombre ?: "Usuario", onNavigateToNotifications, isCritical) },
+        topBar = { Header(usuarioActual?.nombre ?: "Usuario", onNavigateToNotifications, unreadCount, isCritical) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (isLoading) {
@@ -79,6 +98,15 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = 100.dp)
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
+
+                if (grupos.isNotEmpty()) {
+                    item {
+                        GroupSelector(
+                            grupos = grupos,
+                            onGroupSelected = { grupoId -> viewModel.cambiarGrupoActivo(grupoId) }
+                        )
+                    }
+                }
                 
                 item { 
                     ModeSelector(
@@ -88,19 +116,23 @@ fun HomeScreen(
                     ) 
                 }
 
-                item { 
-                    presupuestoActivo?.let { presupuesto ->
-                        val listaId = if (presupuesto.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR) "lista-familiar" else "lista-individual"
-                        val estimados = viewModel.getEstimadosPorCategoria(listaId)
-                        
-                        BudgetHero(
-                            presupuesto = presupuesto,
-                            estimados = estimados,
-                            onEditBudget = { nuevoMonto ->
+                item {
+                    val presupuesto = presupuestoActivo
+                    val listaId = if (presupuesto?.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR) "lista-familiar" else "lista-individual"
+                    val estimados = if (presupuesto != null) viewModel.getEstimadosPorCategoria(listaId) else emptyMap()
+
+                    BudgetHero(
+                        presupuesto = presupuesto,
+                        estimados = estimados,
+                        onEditBudget = { nuevoMonto ->
+                            if (presupuesto != null) {
                                 viewModel.actualizarPresupuesto(presupuesto.id, nuevoMonto)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Presupuesto actualizado")
+                                }
                             }
-                        )
-                    }
+                        }
+                    )
                 }
 
                 item { 
@@ -141,8 +173,108 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                // DETAILED STATISTICS SECTION
+                item {
+                    Text(
+                        text = "ESTADÍSTICAS DETALLADAS",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            letterSpacing = 2.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    )
+                }
+
+                item {
+                    DetailedStatsCard("Gasto por Supermercado") {
+                        Column {
+                            if (spendingByStore.isEmpty()) {
+                                Text("Sin datos", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                StatRow("Sin compras", "\$0", 0.0)
+                            } else {
+                                spendingByStore.forEach { store ->
+                                    StatRow(store.storeName, formatPrice(store.total.toInt()), store.percentage / 100.0)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    val maxCount = mostPurchasedProducts.maxOfOrNull { it.count } ?: 1
+                    DetailedStatsCard("Productos más comprados") {
+                        Column {
+                            if (mostPurchasedProducts.isEmpty()) {
+                                Text("Sin datos", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                StatRow("Sin productos", "x0", 0.0)
+                            } else {
+                                mostPurchasedProducts.take(5).forEach { prod ->
+                                    StatRow("${prod.productName} (x${prod.count})", formatPrice(prod.totalSpent.toInt()), prod.count.toDouble() / maxCount)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    DetailedStatsCard("Gasto por Miembro") {
+                        Column {
+                            if (memberSpending.isEmpty()) {
+                                Text("Sin datos", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                StatRow("Sin miembros", "\$0", 0.0)
+                            } else {
+                                memberSpending.forEach { member ->
+                                    StatRow(member.userName, formatPrice(member.totalSpent.toInt()), member.percentage / 100.0)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+fun DetailedStatsCard(title: String, content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+            Spacer(modifier = Modifier.height(20.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+fun StatRow(label: String, value: String, fraction: Double) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = { fraction.toFloat().coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+            color = Emerald500,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     }
 }
 
@@ -152,7 +284,7 @@ fun formatPrice(amount: Int): String {
 }
 
 @Composable
-fun Header(userName: String, onNotificationsClick: () -> Unit, isCritical: Boolean = false) {
+fun Header(userName: String, onNotificationsClick: () -> Unit, unreadCount: Int = 0, isCritical: Boolean = false) {
     val headerBrush = if (isCritical) {
         Brush.horizontalGradient(listOf(Amber500.copy(alpha = 0.15f), Rose500.copy(alpha = 0.15f)))
     } else {
@@ -209,13 +341,22 @@ fun Header(userName: String, onNotificationsClick: () -> Unit, isCritical: Boole
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape)
-                            .align(Alignment.TopEnd)
-                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
-                    )
+                    if (unreadCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                                .padding(horizontal = if (unreadCount > 9) 4.dp else 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                if (unreadCount > 99) "99+" else unreadCount.toString(),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -242,31 +383,101 @@ fun Header(userName: String, onNotificationsClick: () -> Unit, isCritical: Boole
 
 @Composable
 fun ModeSelector(activeId: String, presupuestos: List<Presupuesto>, onModeChange: (String) -> Unit) {
-    val familiarId = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR }?.id ?: "presupuesto-familiar"
-    val individualId = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.INDIVIDUAL }?.id ?: "presupuesto-individual"
+    val familiar = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR }
+    val individual = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.INDIVIDUAL }
+
+    val familiarId = familiar?.id
+    val individualId = individual?.id
+    val isIndividual = activeId == individualId
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(32.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(32.dp))
             .padding(6.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            val isIndividual = activeId == individualId
             SelectorItem(
                 text = "INDIVIDUAL",
                 isSelected = isIndividual,
-                onClick = { onModeChange(individualId) },
+                onClick = { onModeChange(individualId ?: "individual_default") },
                 modifier = Modifier.weight(1f)
             )
             SelectorItem(
-                text = "FAMILIAR",
+                text = "GRUPO",
                 isSelected = !isIndividual,
-                onClick = { onModeChange(familiarId) },
+                onClick = { onModeChange(familiarId ?: "familiar_default") },
                 modifier = Modifier.weight(1f)
             )
+        }
+    }
+}
+
+@Composable
+fun GroupSelector(grupos: List<GroupDetailResponse>, onGroupSelected: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val grupoActual = grupos.firstOrNull()
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+            onClick = { expanded = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Groups, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        grupoActual?.name ?: "Sin grupo",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    if (grupoActual != null) {
+                        Text(
+                            grupoActual.categoria ?: "GRUPO",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 10.sp
+                            )
+                        )
+                    }
+                }
+                Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            grupos.forEach { grupo ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(grupo.name, fontWeight = FontWeight.Bold)
+                                Text(
+                                    grupo.categoria ?: "GRUPO",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 10.sp
+                                    )
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        onGroupSelected(grupo.id)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
@@ -294,20 +505,24 @@ fun SelectorItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
 }
 
 @Composable
-fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditBudget: (Int) -> Unit) {
+fun BudgetHero(presupuesto: Presupuesto?, estimados: Map<Categoria, Int>, onEditBudget: (Int) -> Unit) {
     var showEditDialog by remember { mutableStateOf(false) }
     var showDetailsDialog by remember { mutableStateOf(false) }
-    
+
+    if (presupuesto == null) {
+        EmptyBudgetHero(onEditBudget = onEditBudget)
+        return
+    }
+
     val totalMonto = if (presupuesto.montoTotal <= 0) 1 else presupuesto.montoTotal
-    
     val esenTotal = estimados[Categoria.ESENCIAL] ?: 0
     val prinTotal = estimados[Categoria.PRINCIPAL] ?: 0
     val secTotal = estimados[Categoria.SECUNDARIO] ?: 0
-    
+
     val ratioEsen = (esenTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
     val ratioPrin = (prinTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
     val ratioSec = (secTotal.toFloat() / totalMonto).coerceIn(0f, 1f)
-    
+
     val gastado = presupuesto.montoTotal - presupuesto.montoDisponible
     val porcentajeGastado = if (presupuesto.montoTotal > 0) {
         (gastado.toFloat() / presupuesto.montoTotal) * 100
@@ -325,33 +540,39 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
             val colorScheme = MaterialTheme.colorScheme
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawArc(
-                    color = colorScheme.outline,
+                    color = colorScheme.surfaceVariant,
                     startAngle = 0f,
                     sweepAngle = 360f,
                     useCenter = false,
                     style = Stroke(width = 12.dp.toPx())
                 )
-                drawArc(
-                    color = Emerald500,
-                    startAngle = -90f,
-                    sweepAngle = 360f * ratioEsen,
-                    useCenter = false,
-                    style = Stroke(width = 12.dp.toPx())
-                )
-                drawArc(
-                    color = Blue500,
-                    startAngle = -90f + (360f * ratioEsen),
-                    sweepAngle = 360f * ratioPrin,
-                    useCenter = false,
-                    style = Stroke(width = 12.dp.toPx())
-                )
-                drawArc(
-                    color = Amber500,
-                    startAngle = -90f + (360f * (ratioEsen + ratioPrin)),
-                    sweepAngle = 360f * ratioSec,
-                    useCenter = false,
-                    style = Stroke(width = 12.dp.toPx())
-                )
+                if (ratioEsen > 0) {
+                    drawArc(
+                        color = Emerald500,
+                        startAngle = -90f,
+                        sweepAngle = 360f * ratioEsen,
+                        useCenter = false,
+                        style = Stroke(width = 12.dp.toPx())
+                    )
+                }
+                if (ratioPrin > 0) {
+                    drawArc(
+                        color = Blue500,
+                        startAngle = -90f + (360f * ratioEsen),
+                        sweepAngle = 360f * ratioPrin,
+                        useCenter = false,
+                        style = Stroke(width = 12.dp.toPx())
+                    )
+                }
+                if (ratioSec > 0) {
+                    drawArc(
+                        color = Amber500,
+                        startAngle = -90f + (360f * (ratioEsen + ratioPrin)),
+                        sweepAngle = 360f * ratioSec,
+                        useCenter = false,
+                        style = Stroke(width = 12.dp.toPx())
+                    )
+                }
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -360,31 +581,24 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
                 Text(
                     "DISPONIBLE",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = Emerald500,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp
+                        color = Emerald500, fontSize = 9.sp,
+                        fontWeight = FontWeight.Black, letterSpacing = 1.sp
                     )
                 )
                 Text(
                     formatPrice(presupuesto.montoDisponible),
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        color = colorScheme.onBackground,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 28.sp
+                        color = colorScheme.onBackground, fontWeight = FontWeight.Black, fontSize = 28.sp
                     )
                 )
                 Text(
                     "TOTAL: ${formatPrice(presupuesto.montoTotal)}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = colorScheme.onSurfaceVariant,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
+                        color = colorScheme.onSurfaceVariant, fontSize = 9.sp, fontWeight = FontWeight.Bold
                     )
                 )
             }
-            
-            // Details Dialog
+
             if (showDetailsDialog) {
                 AlertDialog(
                     onDismissRequest = { showDetailsDialog = false },
@@ -411,17 +625,12 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
                         }
                     },
                     confirmButton = {
-                        TextButton(onClick = { 
-                            showDetailsDialog = false
-                            showEditDialog = true
-                        }) {
-                            Text("EDITAR", color = MaterialTheme.colorScheme.primary)
-                        }
+                        TextButton(onClick = {
+                            showDetailsDialog = false; showEditDialog = true
+                        }) { Text("EDITAR", color = MaterialTheme.colorScheme.primary) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDetailsDialog = false }) {
-                            Text("CERRAR", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        TextButton(onClick = { showDetailsDialog = false }) { Text("CERRAR", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 )
             }
@@ -431,40 +640,21 @@ fun BudgetHero(presupuesto: Presupuesto, estimados: Map<Categoria, Int>, onEditB
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.padding(start = 8.dp)
         ) {
-            LegendItem(Emerald500, "ESENCIAL", formatPrice(esenTotal))
-            LegendItem(Blue500, "PRINCIPAL", formatPrice(prinTotal))
-            LegendItem(Amber500, "SECUNDARIO", formatPrice(secTotal))
+            if (ratioEsen + ratioPrin + ratioSec == 0f) {
+                Text("Sin datos", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            } else {
+                LegendItem(Emerald500, "ESENCIAL", formatPrice(esenTotal))
+                LegendItem(Blue500, "PRINCIPAL", formatPrice(prinTotal))
+                LegendItem(Amber500, "SECUNDARIO", formatPrice(secTotal))
+            }
         }
     }
 
     if (showEditDialog) {
-        var newAmount by remember { mutableStateOf(presupuesto.montoTotal.toString()) }
-        AlertDialog(
-            onDismissRequest = { showEditDialog = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Editar Presupuesto", color = MaterialTheme.colorScheme.onSurface) },
-            text = {
-                TextField(
-                    value = newAmount,
-                    onValueChange = { newAmount = it },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { 
-                    val cleaned = newAmount.filter { it.isDigit() }.toIntOrNull() ?: 0
-                    onEditBudget(cleaned)
-                    showEditDialog = false 
-                }) {
-                    Text("GUARDAR", color = MaterialTheme.colorScheme.primary)
-                }
-            }
+        EditBudgetDialog(
+            currentTotal = presupuesto.montoTotal,
+            onSave = onEditBudget,
+            onDismiss = { showEditDialog = false }
         )
     }
 }
@@ -574,27 +764,14 @@ fun AITipCard() {
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "TIP DE AHORRO (IA)",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = White.copy(alpha = 0.8f),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black
-                        )
+                Text(
+                    "TIP DE AHORRO (IA)",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = White.copy(alpha = 0.8f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Surface(
-                        color = White.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            "PRÓXIMAMENTE",
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall.copy(color = White, fontSize = 7.sp)
-                        )
-                    }
-                }
+                )
                 Text(
                     "Estás gastando un 12% menos que el mes pasado en lácteos.",
                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -654,4 +831,92 @@ fun PurchaseRow(supermarket: String, date: String, amount: String) {
             )
         )
     }
+}
+
+@Composable
+fun EmptyBudgetHero(onEditBudget: (Int) -> Unit) {
+    var showEditDialog by remember { mutableStateOf(false) }
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier.size(120.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawArc(
+                        color = surfaceVariant,
+                        startAngle = 0f, sweepAngle = 360f,
+                        useCenter = false, style = Stroke(width = 10.dp.toPx())
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("SIN", style = MaterialTheme.typography.labelSmall.copy(
+                        color = onSurfaceVariant, fontSize = 9.sp,
+                        fontWeight = FontWeight.Black, letterSpacing = 1.sp
+                    ))
+                    Text("SALDO", style = MaterialTheme.typography.labelSmall.copy(
+                        color = onSurfaceVariant, fontSize = 9.sp,
+                        fontWeight = FontWeight.Black, letterSpacing = 1.sp
+                    ))
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { showEditDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(16.dp)
+            ) { Text("EDITAR SALDO") }
+        }
+    }
+
+    if (showEditDialog) {
+        EditBudgetDialog(
+            currentTotal = 0,
+            onSave = onEditBudget,
+            onDismiss = { showEditDialog = false }
+        )
+    }
+}
+
+@Composable
+fun EditBudgetDialog(currentTotal: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit) {
+    var newAmount by remember { mutableStateOf(currentTotal.toString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text("Editar Presupuesto", color = MaterialTheme.colorScheme.onSurface) },
+        text = {
+            TextField(
+                value = newAmount,
+                onValueChange = { newAmount = it },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val cleaned = newAmount.filter { it.isDigit() }.toIntOrNull() ?: 0
+                onSave(cleaned)
+            }) { Text("GUARDAR", color = MaterialTheme.colorScheme.primary) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCELAR", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    )
 }

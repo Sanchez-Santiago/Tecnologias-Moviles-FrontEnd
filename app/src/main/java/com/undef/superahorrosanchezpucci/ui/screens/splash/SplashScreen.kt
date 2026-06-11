@@ -36,7 +36,7 @@ fun SplashScreen(navController: NavController) {
             AppStateStore.get(app)
         }
 
-        delay(1000)
+        delay(300)
         if (AuthSessionStore.accessToken != null) {
             navController.navigate("INICIO") {
                 popUpTo("SPLASH") { inclusive = true }

@@ -17,5 +17,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateThemeMode(mode: ThemeMode) = store.updateThemeMode(mode)
     fun actualizarUsuario(usuario: Usuario) = store.actualizarUsuario(usuario)
+    suspend fun cambiarPassword(currentPassword: String, newPassword: String): Result<String> =
+        store.cambiarPassword(currentPassword, newPassword)
     fun logout() = store.logout()
 }

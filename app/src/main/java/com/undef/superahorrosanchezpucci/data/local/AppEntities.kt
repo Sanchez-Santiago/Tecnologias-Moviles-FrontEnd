@@ -78,12 +78,6 @@ data class UsuarioEntity(
     val activo: Boolean
 )
 
-@Entity(tableName = "app_config")
-data class AppConfigEntity(
-    @PrimaryKey val id: String = "config",
-    val themeMode: String
-)
-
 @Entity(tableName = "catalogo_productos")
 data class CatalogoProductoEntity(
     @PrimaryKey val id: String,
@@ -107,4 +101,54 @@ data class TiendaEntity(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val active: Boolean
+)
+
+@Entity(tableName = "grupos")
+data class GrupoEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val description: String? = null,
+    val categoria: String? = "FAMILIA",
+    val createdBy: String,
+    val membersJson: String,
+    val createdAt: String = ""
+)
+
+@Entity(tableName = "invitaciones")
+data class InvitacionEntity(
+    @PrimaryKey val id: String,
+    val groupId: String,
+    val groupName: String,
+    val invitedBy: String,
+    val invitedByEmail: String,
+    val status: String,
+    val token: String,
+    val expiresAt: String = "",
+    val createdAt: String = ""
+)
+
+@Entity(tableName = "notifications_cache")
+data class NotificationCacheEntity(
+    @PrimaryKey val id: String,
+    val type: String,
+    val title: String,
+    val message: String,
+    val data: String? = null,
+    val read: Boolean = false,
+    val createdAt: String = ""
+)
+
+@Entity(tableName = "offers_cache")
+data class OfferCacheEntity(
+    @PrimaryKey val id: String,
+    val storeId: String? = null,
+    val storeName: String? = null,
+    val title: String,
+    val description: String? = null,
+    val discountType: String,
+    val discountValue: Double,
+    val startDate: String = "",
+    val endDate: String = "",
+    val imageUrl: String? = null,
+    val active: Boolean = true
 )

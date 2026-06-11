@@ -231,3 +231,22 @@ fun TicketsSkeleton() {
         }
     }
 }
+
+@Composable
+fun FamilySkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Spacer(modifier = Modifier.height(24.dp))
+        // Title skeleton
+        ShimmerBox(height = 12.dp, width = 200.dp)
+        Spacer(modifier = Modifier.height(8.dp))
+        // Members list skeleton
+        repeat(5) {
+            ShimmerBox(height = 80.dp)
+        }
+    }
+}

@@ -78,6 +78,9 @@ dependencies {
     // Security Crypto (EncryptedSharedPreferences)
     implementation(libs.security.crypto)
 
+    // DataStore Preferences
+    implementation(libs.datastore.preferences)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

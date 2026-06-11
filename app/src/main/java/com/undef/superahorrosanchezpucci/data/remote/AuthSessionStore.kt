@@ -7,10 +7,13 @@ object AuthSessionStore {
     private const val ACCESS_TOKEN = "access_token"
     private const val REFRESH_TOKEN = "refresh_token"
 
+    private var appContext: Context? = null
+
     var accessToken: String? = null
     var refreshToken: String? = null
 
     fun initialize(context: Context) {
+        appContext = context.applicationContext
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         accessToken = prefs.getString(ACCESS_TOKEN, null)
         refreshToken = prefs.getString(REFRESH_TOKEN, null)
@@ -24,6 +27,16 @@ object AuthSessionStore {
             .putString(ACCESS_TOKEN, accessToken)
             .putString(REFRESH_TOKEN, refreshToken)
             .apply()
+    }
+
+    fun save(accessToken: String?, refreshToken: String?) {
+        this.accessToken = accessToken
+        this.refreshToken = refreshToken
+        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString(ACCESS_TOKEN, accessToken)
+            ?.putString(REFRESH_TOKEN, refreshToken)
+            ?.apply()
     }
 
     fun clear(context: Context) {

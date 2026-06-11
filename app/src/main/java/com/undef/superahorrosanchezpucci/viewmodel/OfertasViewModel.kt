@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.Presupuesto
 import com.undef.superahorrosanchezpucci.data.model.Ticket
+import com.undef.superahorrosanchezpucci.data.remote.dto.OfferResponse
 import kotlinx.coroutines.flow.StateFlow
 
 class OfertasViewModel(application: Application) : AndroidViewModel(application) {
@@ -13,5 +14,8 @@ class OfertasViewModel(application: Application) : AndroidViewModel(application)
     val presupuestos: StateFlow<List<Presupuesto>> = store.presupuestos
     val listas: StateFlow<List<ListaCompra>> = store.listas
     val tickets: StateFlow<List<Ticket>> = store.tickets
+    val offers: StateFlow<List<OfferResponse>> = store.offers
     val isLoading: StateFlow<Boolean> = store.isLoading
+
+    fun loadActiveOffers() = store.loadActiveOffers()
 }

@@ -7,13 +7,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.ShoppingBag
-import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,30 +22,17 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.undef.superahorrosanchezpucci.data.model.ListaCompra
-import com.undef.superahorrosanchezpucci.data.model.Presupuesto
-import com.undef.superahorrosanchezpucci.data.model.Ticket
-import com.undef.superahorrosanchezpucci.ui.screens.tickets.formatPrice
+import com.undef.superahorrosanchezpucci.data.remote.dto.OfferResponse
 import com.undef.superahorrosanchezpucci.ui.theme.*
 import com.undef.superahorrosanchezpucci.viewmodel.OfertasViewModel
-import kotlin.math.abs
 
-data class Oferta(
-    val supermercado: String,
-    val producto: String,
-    val descripcion: String,
-    val precioAnterior: Int,
-    val precioOferta: Int,
-    val descuento: Int,
-    val motivo: String,
-    val score: Int
-)
-
-private data class ProductoFrecuente(
-    val nombre: String,
-    val descripcion: String,
-    val precioBase: Int,
-    val score: Int
+private data class MatchedOffer(
+    val offer: OfferResponse,
+    val matchedProductName: String,
+    val reason: String,
+    val discountedPrice: Int?,
+    val originalPrice: Int?,
+    val discountPercent: Int
 )
 
 @Composable
@@ -53,11 +40,34 @@ fun OfertasScreen(viewModel: OfertasViewModel) {
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
     val listas by viewModel.listas.collectAsStateWithLifecycle()
     val tickets by viewModel.tickets.collectAsStateWithLifecycle()
+    val offers by viewModel.offers.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
-    val presupuestoActivo = presupuestos.find { it.activo }
-    val ofertas = remember(listas, tickets, presupuestoActivo) {
-        generarOfertasPersonalizadas(listas, tickets, presupuestoActivo)
+    LaunchedEffect(Unit) {
+        viewModel.loadActiveOffers()
+    }
+
+    val matchedOffers = remember(offers, listas, tickets) {
+        if (offers.isEmpty()) emptyList()
+        else matchOffersToProducts(offers, listas, tickets)
+    }
+
+    var selectedStore by remember { mutableStateOf("TODOS") }
+    var minDiscount by remember { mutableStateOf(0) }
+    var storeFilterExpanded by remember { mutableStateOf(false) }
+    var discountFilterExpanded by remember { mutableStateOf(false) }
+
+    val stores = remember(matchedOffers) {
+        matchedOffers.map { it.offer.storeName ?: "General" }.distinct().sorted()
+    }
+    val discountOptions = listOf(0 to "Todos", 10 to "10%+", 25 to "25%+", 50 to "50%+")
+
+    val filteredOffers = remember(matchedOffers, selectedStore, minDiscount) {
+        matchedOffers.filter { m ->
+            val storeMatch = selectedStore == "TODOS" || (m.offer.storeName ?: "General") == selectedStore
+            val discountMatch = m.discountPercent >= minDiscount
+            storeMatch && discountMatch
+        }
     }
 
     Scaffold(
@@ -81,12 +91,12 @@ fun OfertasScreen(viewModel: OfertasViewModel) {
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             when {
-                isLoading -> {
+                isLoading && offers.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                ofertas.isEmpty() -> {
+                matchedOffers.isEmpty() -> {
                     EmptyOffersState()
                 }
                 else -> {
@@ -95,10 +105,47 @@ fun OfertasScreen(viewModel: OfertasViewModel) {
                             .fillMaxSize()
                             .padding(horizontal = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(top = 24.dp, bottom = 100.dp)
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
                     ) {
-                        items(ofertas, key = { "${it.supermercado}-${it.producto}-${it.descuento}" }) { oferta ->
-                            OfertaCard(oferta)
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box {
+                                    OutlinedButton(
+                                        onClick = { storeFilterExpanded = true },
+                                        shape = RoundedCornerShape(20.dp)
+                                    ) {
+                                        Text(if (selectedStore == "TODOS") "Supermercado" else selectedStore, fontSize = 12.sp)
+                                        Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp))
+                                    }
+                                    DropdownMenu(expanded = storeFilterExpanded, onDismissRequest = { storeFilterExpanded = false }) {
+                                        DropdownMenuItem(text = { Text("Todas") }, onClick = { selectedStore = "TODOS"; storeFilterExpanded = false })
+                                        stores.forEach { store ->
+                                            DropdownMenuItem(text = { Text(store) }, onClick = { selectedStore = store; storeFilterExpanded = false })
+                                        }
+                                    }
+                                }
+                                Box {
+                                    OutlinedButton(
+                                        onClick = { discountFilterExpanded = true },
+                                        shape = RoundedCornerShape(20.dp)
+                                    ) {
+                                        Text("${minDiscount}%+ desc.", fontSize = 12.sp)
+                                        Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp))
+                                    }
+                                    DropdownMenu(expanded = discountFilterExpanded, onDismissRequest = { discountFilterExpanded = false }) {
+                                        discountOptions.forEach { (value, label) ->
+                                            DropdownMenuItem(text = { Text(label) }, onClick = { minDiscount = value; discountFilterExpanded = false })
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                        items(filteredOffers, key = { "${it.offer.id}-${it.matchedProductName}" }) { match ->
+                            MatchedOfferCard(match)
                         }
                     }
                 }
@@ -118,13 +165,13 @@ private fun EmptyOffersState() {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.LocalOffer, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
             Text(
-                "Todavia no hay productos suficientes",
+                "No hay ofertas disponibles",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
             Text(
-                "Agrega productos a tus listas o carga tickets con desglose para ver ofertas mas precisas.",
+                "Agrega productos a tus listas o carga tickets con desglose para ver ofertas personalizadas.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
@@ -133,7 +180,7 @@ private fun EmptyOffersState() {
 }
 
 @Composable
-fun OfertaCard(oferta: Oferta) {
+private fun MatchedOfferCard(match: MatchedOffer) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -160,186 +207,104 @@ fun OfertaCard(oferta: Oferta) {
                     Icon(Icons.Default.Store, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        "Supermercado: ${oferta.supermercado}",
+                        match.offer.storeName ?: "Varios supermercados",
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Black
                     )
                 }
-                Text(oferta.producto, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(oferta.descripcion, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                Text(oferta.motivo, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                Text(match.offer.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                match.offer.description?.let { desc ->
+                    Text(desc, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 2)
+                }
+                Text("Coincide con: ${match.matchedProductName}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        formatPrice(oferta.precioAnterior),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
-                        style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.LineThrough)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        formatPrice(oferta.precioOferta),
-                        color = Emerald500,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 18.sp
-                    )
+                    if (match.discountedPrice != null && match.originalPrice != null) {
+                        Text(
+                            "$${match.originalPrice}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.LineThrough)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "$${match.discountedPrice}",
+                            color = Emerald500,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .background(Emerald600, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    "${oferta.descuento}% OFF",
-                    color = White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black
-                )
+            if (match.discountPercent > 0) {
+                Box(
+                    modifier = Modifier
+                        .background(Emerald600, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        "${match.discountPercent}% OFF",
+                        color = White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
         }
     }
 }
 
-private fun generarOfertasPersonalizadas(
-    listas: List<ListaCompra>,
-    tickets: List<Ticket>,
-    presupuestoActivo: Presupuesto?
-): List<Oferta> {
-    val listasDelModo = if (presupuestoActivo == null) {
-        listas
-    } else {
-        listas.filter { it.presupuestoId == presupuestoActivo.id }
+private fun matchOffersToProducts(
+    offers: List<OfferResponse>,
+    listas: List<com.undef.superahorrosanchezpucci.data.model.ListaCompra>,
+    tickets: List<com.undef.superahorrosanchezpucci.data.model.Ticket>
+): List<MatchedOffer> {
+    val productNames = mutableSetOf<String>()
+
+    listas.flatMap { it.productos }.forEach { p ->
+        p.nombre.trim().takeIf { it.isNotBlank() }?.let { productNames.add(it.lowercase()) }
+    }
+    tickets.flatMap { it.productos }.forEach { p ->
+        p.nombre.trim().takeIf { it.isNotBlank() }?.let { productNames.add(it.lowercase()) }
     }
 
-    val frecuentes = buildMap<String, ProductoFrecuente> {
-        listasDelModo.flatMap { it.productos }.forEach { producto ->
-            val nombre = producto.nombre.trim()
-            if (nombre.isBlank()) return@forEach
-            val key = normalizarProducto(nombre)
-            val precio = listOf(producto.precioReal, producto.precioEstimado, producto.precio)
-                .filterNotNull()
-                .firstOrNull { it > 0 } ?: precioReferencia(nombre)
-            val score = producto.cantidad + if (producto.comprado) 2 else 1
-            val actual = this[key]
-            put(
-                key,
-                ProductoFrecuente(
-                    nombre = actual?.nombre ?: nombre,
-                    descripcion = actual?.descripcion?.takeIf { it.isNotBlank() }
-                        ?: producto.descripcion.ifBlank { descripcionReferencia(nombre) },
-                    precioBase = maxOf(actual?.precioBase ?: 0, precio),
-                    score = (actual?.score ?: 0) + score
+    if (productNames.isEmpty()) return emptyList()
+
+    val matched = mutableListOf<MatchedOffer>()
+
+    offers.forEach { offer ->
+        val offerText = "${offer.title} ${offer.description ?: ""} ${offer.termsConditions ?: ""}".lowercase()
+        var bestMatch: String? = null
+
+        for (name in productNames) {
+            val keywords = name.split(" ").filter { it.length >= 3 }
+            if (keywords.isEmpty()) continue
+            if (keywords.any { keyword -> offerText.contains(keyword) }) {
+                bestMatch = name
+                break
+            }
+        }
+
+        if (bestMatch != null) {
+            val discountPercent = if (offer.discountType == "PERCENTAGE") {
+                offer.discountValue.toInt()
+            } else 0
+            val originalPrice = null
+            val discountedPrice = null
+
+            matched.add(
+                MatchedOffer(
+                    offer = offer,
+                    matchedProductName = bestMatch,
+                    reason = "Producto en tu lista de compras",
+                    discountedPrice = discountedPrice,
+                    originalPrice = originalPrice,
+                    discountPercent = discountPercent
                 )
             )
         }
-
-        tickets.flatMap { it.productos }.forEach { producto ->
-            val nombre = producto.nombre.trim()
-            if (nombre.isBlank()) return@forEach
-            val key = normalizarProducto(nombre)
-            val precio = producto.precio.takeIf { it > 0 } ?: precioReferencia(nombre)
-            val actual = this[key]
-            put(
-                key,
-                ProductoFrecuente(
-                    nombre = actual?.nombre ?: nombre,
-                    descripcion = actual?.descripcion?.takeIf { it.isNotBlank() }
-                        ?: descripcionReferencia(nombre),
-                    precioBase = maxOf(actual?.precioBase ?: 0, precio),
-                    score = (actual?.score ?: 0) + (producto.cantidad * 3)
-                )
-            )
-        }
-    }.values
-
-    val base = if (frecuentes.isNotEmpty()) {
-        frecuentes.sortedByDescending { it.score }.take(12)
-    } else {
-        productosBase()
     }
 
-    return base
-        .mapIndexed { index, producto -> producto.toOferta(index) }
-        .sortedWith(compareByDescending<Oferta> { it.score }.thenByDescending { it.descuento })
-        .take(10)
-}
-
-private fun ProductoFrecuente.toOferta(index: Int): Oferta {
-    val descuento = 12 + abs(nombre.hashCode() + index).mod(24)
-    val precioAnterior = precioBase.takeIf { it > 0 } ?: precioReferencia(nombre)
-    val precioOferta = (precioAnterior * (100 - descuento) / 100.0).toInt().coerceAtLeast(1)
-    val supermercados = listOf(
-        "Carrefour",
-        "Coto",
-        "Jumbo",
-        "Disco",
-        "Vea",
-        "La Anonima",
-        "Hipermercado Libertad"
-    )
-    val supermercado = supermercados[abs(nombre.hashCode() + index).mod(supermercados.size)]
-
-    return Oferta(
-        supermercado = supermercado,
-        producto = nombre,
-        descripcion = descripcion.ifBlank { descripcionReferencia(nombre) },
-        precioAnterior = precioAnterior,
-        precioOferta = precioOferta,
-        descuento = descuento,
-        motivo = if (score > 3) "Producto frecuente" else "Similar a tu lista",
-        score = score
-    )
-}
-
-private fun productosBase(): List<ProductoFrecuente> {
-    return listOf(
-        ProductoFrecuente("Leche Entera 1L", "Lacteo de compra frecuente", 1200, 1),
-        ProductoFrecuente("Pan Tajado", "Panificado para reposicion semanal", 1800, 1),
-        ProductoFrecuente("Arroz 1kg", "Almacen basico para la lista", 2500, 1),
-        ProductoFrecuente("Aceite Girasol 1.5L", "Producto de cocina y despensa", 4200, 1)
-    )
-}
-
-private fun descripcionReferencia(nombre: String): String {
-    val normalized = normalizarProducto(nombre)
-    return when {
-        "leche" in normalized -> "Lacteo de compra frecuente"
-        "pan" in normalized -> "Panificado para reposicion semanal"
-        "arroz" in normalized -> "Almacen basico para la lista"
-        "aceite" in normalized -> "Producto de cocina y despensa"
-        "yerba" in normalized -> "Infusion habitual del hogar"
-        "azucar" in normalized -> "Almacen y desayuno"
-        "fideo" in normalized || "pasta" in normalized -> "Almacen para comidas rapidas"
-        "huevo" in normalized -> "Proteina fresca de alta rotacion"
-        "pollo" in normalized -> "Fresco recomendado para planificar comidas"
-        "carne" in normalized -> "Corte fresco para compras grandes"
-        else -> "Oferta sugerida segun tu historial"
-    }
-}
-
-private fun precioReferencia(nombre: String): Int {
-    val normalized = normalizarProducto(nombre)
-    return when {
-        "leche" in normalized -> 1200
-        "pan" in normalized -> 1800
-        "arroz" in normalized -> 2500
-        "aceite" in normalized -> 4200
-        "yerba" in normalized -> 3500
-        "azucar" in normalized -> 1600
-        "fideo" in normalized || "pasta" in normalized -> 1700
-        "huevo" in normalized -> 3000
-        "pollo" in normalized -> 5500
-        "carne" in normalized -> 8000
-        else -> 2200
-    }
-}
-
-private fun normalizarProducto(value: String): String {
-    return value
-        .lowercase()
-        .replace(Regex("[^a-z0-9áéíóúñ ]"), " ")
-        .replace(Regex("\\s+"), " ")
-        .trim()
+    return matched.sortedByDescending { it.discountPercent }
 }

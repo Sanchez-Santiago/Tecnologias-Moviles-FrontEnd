@@ -8,6 +8,19 @@ import com.undef.superahorrosanchezpucci.data.model.Producto
 import com.undef.superahorrosanchezpucci.data.model.Ticket
 import com.undef.superahorrosanchezpucci.data.model.TicketImageAnalysis
 import com.undef.superahorrosanchezpucci.data.model.Usuario
+import com.undef.superahorrosanchezpucci.data.remote.dto.GroupDetailResponse
+import com.undef.superahorrosanchezpucci.data.remote.dto.InvitationResponse
+import com.undef.superahorrosanchezpucci.data.remote.dto.MonthlySummary
+import com.undef.superahorrosanchezpucci.data.remote.dto.NotificationResponse
+import com.undef.superahorrosanchezpucci.data.remote.dto.AiOfferSuggestion
+import com.undef.superahorrosanchezpucci.data.remote.dto.OfferResponse
+import com.undef.superahorrosanchezpucci.data.remote.dto.SpendingByCategory
+import com.undef.superahorrosanchezpucci.data.remote.dto.SpendingByImportance
+import com.undef.superahorrosanchezpucci.data.remote.dto.SpendingByStore
+import com.undef.superahorrosanchezpucci.data.remote.dto.StoreFrequency
+import com.undef.superahorrosanchezpucci.data.remote.dto.MostPurchasedProduct
+import com.undef.superahorrosanchezpucci.data.remote.dto.MemberSpending
+import com.undef.superahorrosanchezpucci.data.remote.dto.BudgetProgress
 import com.undef.superahorrosanchezpucci.data.remote.AuthSessionStore
 import com.undef.superahorrosanchezpucci.data.repository.AppRepository
 import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
@@ -43,6 +56,42 @@ class AppStateStore private constructor(application: Application) {
     private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
+    private val _grupos = MutableStateFlow<List<GroupDetailResponse>>(emptyList())
+    val grupos: StateFlow<List<GroupDetailResponse>> = _grupos.asStateFlow()
+
+    private val _invitaciones = MutableStateFlow<List<InvitationResponse>>(emptyList())
+    val invitaciones: StateFlow<List<InvitationResponse>> = _invitaciones.asStateFlow()
+
+    private val _spendingByCategory = MutableStateFlow<List<SpendingByCategory>>(emptyList())
+    val spendingByCategory: StateFlow<List<SpendingByCategory>> = _spendingByCategory.asStateFlow()
+
+    private val _spendingByStore = MutableStateFlow<List<SpendingByStore>>(emptyList())
+    val spendingByStore: StateFlow<List<SpendingByStore>> = _spendingByStore.asStateFlow()
+
+    private val _spendingByImportance = MutableStateFlow<List<SpendingByImportance>>(emptyList())
+    val spendingByImportance: StateFlow<List<SpendingByImportance>> = _spendingByImportance.asStateFlow()
+
+    private val _monthlySummary = MutableStateFlow<List<MonthlySummary>>(emptyList())
+    val monthlySummary: StateFlow<List<MonthlySummary>> = _monthlySummary.asStateFlow()
+
+    private val _notifications = MutableStateFlow<List<NotificationResponse>>(emptyList())
+    val notifications: StateFlow<List<NotificationResponse>> = _notifications.asStateFlow()
+
+    private val _offers = MutableStateFlow<List<OfferResponse>>(emptyList())
+    val offers: StateFlow<List<OfferResponse>> = _offers.asStateFlow()
+
+    private val _storeFrequency = MutableStateFlow<List<StoreFrequency>>(emptyList())
+    val storeFrequency: StateFlow<List<StoreFrequency>> = _storeFrequency.asStateFlow()
+
+    private val _mostPurchasedProducts = MutableStateFlow<List<MostPurchasedProduct>>(emptyList())
+    val mostPurchasedProducts: StateFlow<List<MostPurchasedProduct>> = _mostPurchasedProducts.asStateFlow()
+
+    private val _memberSpending = MutableStateFlow<List<MemberSpending>>(emptyList())
+    val memberSpending: StateFlow<List<MemberSpending>> = _memberSpending.asStateFlow()
+
+    private val _unreadCount = MutableStateFlow(0)
+    val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
+
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -55,6 +104,7 @@ class AppStateStore private constructor(application: Application) {
         scope.launch {
             _isLoading.value = true
             runCatching { repository.cargarTodo() }
+            runCatching { repository.loadUnreadCount() }
             refrescar()
             _themeMode.value = repository.themeMode
             _isLoading.value = false
@@ -152,11 +202,109 @@ class AppStateStore private constructor(application: Application) {
         }
     }
 
-    fun invitarMiembro(email: String) {
+    fun aceptarInvitacion(token: String) {
         scope.launch {
-            val grupoId = repository.grupos.firstOrNull()?.id ?: return@launch
-            repository.inviteMember(grupoId, email)
+            val result = repository.acceptInvitation(token)
+            result.onSuccess { reload() }
+        }
+    }
+
+    fun rechazarInvitacion(token: String) {
+        scope.launch {
+            val result = repository.rejectInvitation(token)
+            result.onSuccess { reload() }
+        }
+    }
+
+    fun invitarMiembro(groupId: String, email: String, onResult: (Result<Unit>) -> Unit) {
+        scope.launch {
+            val result = repository.inviteMember(groupId, email)
+            result.onSuccess { reload() }
+            onResult(result)
+        }
+    }
+
+    suspend fun cambiarPassword(currentPassword: String, newPassword: String): Result<String> {
+        return withContext(Dispatchers.IO) { repository.cambiarPassword(currentPassword, newPassword) }
+    }
+
+    fun loadNotifications() {
+        scope.launch {
+            repository.loadNotifications()
+            _notifications.value = repository.notifications.toList()
+        }
+    }
+
+    fun loadUnreadCount() {
+        scope.launch {
+            repository.loadUnreadCount()
+            _unreadCount.value = repository.unreadCount
+        }
+    }
+
+    fun markNotificationRead(id: String) {
+        scope.launch {
+            repository.markNotificationRead(id)
+            _notifications.value = repository.notifications.toList()
+            _unreadCount.value = repository.unreadCount
+        }
+    }
+
+    fun markAllNotificationsRead() {
+        scope.launch {
+            repository.markAllNotificationsRead()
+            _notifications.value = repository.notifications.toList()
+            _unreadCount.value = repository.unreadCount
+        }
+    }
+
+    fun deleteNotification(id: String) {
+        scope.launch {
+            repository.deleteNotification(id)
+            _notifications.value = repository.notifications.toList()
+        }
+    }
+
+    fun crearGrupo(nombre: String, categoria: String, onResult: (Result<Unit>) -> Unit) {
+        scope.launch {
+            _isLoading.value = true
+            val result = repository.crearGrupo(nombre, categoria)
             refrescar()
+            _isLoading.value = false
+            onResult(result)
+        }
+    }
+
+    fun cambiarGrupoActivo(grupoId: String) {
+        scope.launch {
+            repository.cambiarGrupoActivo(grupoId)
+            refrescar()
+        }
+    }
+
+    fun loadStats(grupoId: String) {
+        scope.launch {
+            repository.loadSpendingByCategory(grupoId).onSuccess { _spendingByCategory.value = it }
+            repository.loadSpendingByStore(grupoId).onSuccess { _spendingByStore.value = it }
+            repository.loadMonthlySummary(grupoId).onSuccess { _monthlySummary.value = it }
+            repository.loadSpendingByImportance(grupoId).onSuccess { _spendingByImportance.value = it }
+            repository.loadStoreFrequency(grupoId).onSuccess { _storeFrequency.value = it }
+            repository.loadMostPurchasedProducts(grupoId).onSuccess { _mostPurchasedProducts.value = it }
+            repository.loadMemberSpending(grupoId).onSuccess { _memberSpending.value = it }
+        }
+    }
+
+    fun loadActiveOffers() {
+        scope.launch {
+            repository.loadActiveOffers()
+            _offers.value = repository.offers.toList()
+        }
+    }
+
+    fun loadBudgetProgress(groupId: String, onResult: (Result<List<BudgetProgress>>) -> Unit) {
+        scope.launch {
+            val result = repository.loadBudgetProgress(groupId)
+            onResult(result)
         }
     }
 
@@ -167,6 +315,16 @@ class AppStateStore private constructor(application: Application) {
             _listas.value = emptyList()
             _tickets.value = emptyList()
             _usuarios.value = emptyList()
+            _grupos.value = emptyList()
+            _invitaciones.value = emptyList()
+            _spendingByCategory.value = emptyList()
+            _spendingByStore.value = emptyList()
+            _spendingByImportance.value = emptyList()
+            _monthlySummary.value = emptyList()
+            _storeFrequency.value = emptyList()
+            _notifications.value = emptyList()
+            _unreadCount.value = 0
+            _offers.value = emptyList()
             _usuarioActual.value = null
         }
     }
@@ -176,6 +334,10 @@ class AppStateStore private constructor(application: Application) {
         scope.launch {
             repository.updateThemeMode(mode)
         }
+    }
+
+    suspend fun aiSuggestOffers(productNames: List<String>, storeId: String? = null): Result<List<AiOfferSuggestion>> {
+        return repository.aiSuggestOffers(productNames, storeId)
     }
 
     suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
@@ -197,6 +359,11 @@ class AppStateStore private constructor(application: Application) {
         _tickets.value = repository.tickets.toList()
         _usuarios.value = repository.usuarios.toList()
         _usuarioActual.value = repository.usuarioActual
+        _grupos.value = repository.grupos.toList()
+        _invitaciones.value = repository.invitaciones.toList()
+        _notifications.value = repository.notifications.toList()
+        _unreadCount.value = repository.unreadCount
+        _offers.value = repository.offers.toList()
     }
 
     companion object {

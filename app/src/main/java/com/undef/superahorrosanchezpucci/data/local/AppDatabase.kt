@@ -13,11 +13,14 @@ import androidx.room.RoomDatabase
         TicketEntity::class,
         TicketProductoEntity::class,
         UsuarioEntity::class,
-        AppConfigEntity::class,
         CatalogoProductoEntity::class,
-        TiendaEntity::class
+        TiendaEntity::class,
+        GrupoEntity::class,
+        InvitacionEntity::class,
+        NotificationCacheEntity::class,
+        OfferCacheEntity::class
     ],
-    version = 2,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

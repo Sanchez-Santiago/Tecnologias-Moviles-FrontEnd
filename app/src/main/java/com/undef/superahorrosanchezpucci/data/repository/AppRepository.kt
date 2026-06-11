@@ -4,6 +4,11 @@ import android.app.Application
 import android.util.Log
 import com.undef.superahorrosanchezpucci.data.local.AppDatabase
 import com.undef.superahorrosanchezpucci.data.local.CatalogoProductoEntity
+import com.undef.superahorrosanchezpucci.data.local.GrupoEntity
+import com.undef.superahorrosanchezpucci.data.local.InvitacionEntity
+import com.undef.superahorrosanchezpucci.data.local.NotificationCacheEntity
+import com.undef.superahorrosanchezpucci.data.local.OfferCacheEntity
+import com.undef.superahorrosanchezpucci.data.local.PreferencesDataStore
 import com.undef.superahorrosanchezpucci.data.local.PresupuestoEntity
 import com.undef.superahorrosanchezpucci.data.local.TiendaEntity
 import com.undef.superahorrosanchezpucci.data.local.toEntity as ticketToEntity
@@ -14,7 +19,12 @@ import com.undef.superahorrosanchezpucci.data.remote.RetrofitClient
 import com.undef.superahorrosanchezpucci.data.remote.dto.*
 import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -23,6 +33,7 @@ class AppRepository(private val application: Application) {
     private val database = AppDatabase.get(application)
     private val appDao = database.appDao()
     private val apiService by lazy { RetrofitClient.getApiService() }
+    private val preferencesDataStore = PreferencesDataStore(application)
 
     var presupuestos = mutableListOf<Presupuesto>()
         private set
@@ -56,34 +67,56 @@ class AppRepository(private val application: Application) {
     // ======================
 
     suspend fun cargarTodo() = withContext(Dispatchers.IO) {
+        cargarDesdeCache()
+        
         if (AuthSessionStore.accessToken.isNullOrBlank()) {
-            inicializarDatos()
+            if (presupuestos.isEmpty()) inicializarDatos()
             return@withContext
         }
 
         try {
+            themeMode = preferencesDataStore.themeModeFlow.first()
             fetchUserProfile()
-            cargarProductos()
-            cargarTiendas()
             
-            // Aseguramos que el usuario tenga un grupo y presupuesto en el backend
+            coroutineScope {
+                val productsDef = async { cargarProductos() }
+                val storesDef = async { cargarTiendas() }
+                productsDef.await()
+                storesDef.await()
+            }
+            
             ensureGroupAndBudget()
             
-            cargarInvitaciones()
-
             val grupoId = grupos.firstOrNull()?.id
             if (grupoId != null) {
-                loadBudgetsFromApi(grupoId)
-                cargarCompras(grupoId)
+                coroutineScope {
+                    val budgetsDef = async { loadBudgetsFromApi(grupoId) }
+                    val purchasesDef = async { cargarCompras(grupoId) }
+                    val listsDef = async { cargarListas(grupoId) }
+                    val notificationsDef = async { loadNotifications() }
+                    val offersDef = async { loadActiveOffers() }
+                    val invitationsDef = async { cargarInvitaciones() }
+                    budgetsDef.await()
+                    purchasesDef.await()
+                    listsDef.await()
+                    notificationsDef.await()
+                    offersDef.await()
+                    invitationsDef.await()
+                }
             } else {
-                loadDefaultLocalBudgets()
+                coroutineScope {
+                    val notificationsDef = async { loadNotifications() }
+                    val offersDef = async { loadActiveOffers() }
+                    val invitationsDef = async { cargarInvitaciones() }
+                    notificationsDef.await()
+                    offersDef.await()
+                    invitationsDef.await()
+                }
             }
             
             recalcularMontoDisponible()
-            inicializarListas()
         } catch (e: Exception) {
             Log.e("AppRepository", "Error en cargarTodo", e)
-            inicializarDatos() // Fallback a locales si todo falla
         }
     }
 
@@ -94,7 +127,7 @@ class AppRepository(private val application: Application) {
         // 2. Si no hay grupos, crear uno por defecto
         if (grupos.isEmpty()) {
             Log.d("AppRepository", "No se encontraron grupos, creando uno...")
-            val createGroupResp = apiService.createGroup(CreateGroupRequest("Mi Familia", "Grupo familiar de Super Ahorro"))
+            val createGroupResp = apiService.createGroup(CreateGroupRequest("Mi Grupo", "Grupo de Super Ahorro"))
             if (createGroupResp.isSuccessful && createGroupResp.body()?.success == true) {
                 cargarGrupos() // Recargar para tener el detalle
             }
@@ -104,22 +137,25 @@ class AppRepository(private val application: Application) {
         
         // 3. Asegurar que el grupo tenga al menos un presupuesto
         val budgetsResp = apiService.getBudgets(grupoId)
-        if (budgetsResp.isSuccessful && (budgetsResp.body()?.data == null || budgetsResp.body()?.data!!.isEmpty())) {
-            Log.d("AppRepository", "No se encontraron presupuestos en el grupo, creando uno...")
-            
-            // Necesitamos una categoría para el presupuesto inicial
-            val categoriesResp = apiService.getCategories()
-            val categoryId = categoriesResp.body()?.data?.firstOrNull()?.id ?: ""
-            
-            val createBudgetReq = CreateBudgetRequest(
-                groupId = grupoId,
-                name = "Presupuesto Mensual",
-                totalAmount = 0.0,
-                period = "MONTHLY",
-                startDate = LocalDateTime.now().toString(),
-                items = if (categoryId.isNotEmpty()) listOf(CreateBudgetItem(categoryId, 0.0)) else emptyList()
-            )
-            apiService.createBudget(createBudgetReq)
+        if (budgetsResp.isSuccessful) {
+            val budgetsData = budgetsResp.body()?.data
+            if (budgetsData == null || budgetsData.isEmpty()) {
+                Log.d("AppRepository", "No se encontraron presupuestos en el grupo, creando uno...")
+                
+                // Necesitamos una categoría para el presupuesto inicial
+                val categoriesResp = apiService.getCategories()
+                val categoryId = categoriesResp.body()?.data?.firstOrNull()?.id ?: ""
+                
+                val createBudgetReq = CreateBudgetRequest(
+                    groupId = grupoId,
+                    name = "Presupuesto Mensual",
+                    totalAmount = 0.0,
+                    period = "MONTHLY",
+                    startDate = LocalDateTime.now().toString(),
+                    items = if (categoryId.isNotEmpty()) listOf(CreateBudgetItem(categoryId, 0.0)) else emptyList()
+                )
+                apiService.createBudget(createBudgetReq)
+            }
         }
     }
 
@@ -178,7 +214,7 @@ class AppRepository(private val application: Application) {
         try {
             val response = apiService.getPurchases(grupoId)
             if (response.isSuccessful && response.body()?.success == true) {
-                val apiPurchases = response.body()!!.data ?: emptyList()
+                val apiPurchases = response.body()?.data ?: emptyList()
                 tickets.clear()
                 
                 for (apiPurchase in apiPurchases) {
@@ -204,9 +240,98 @@ class AppRepository(private val application: Application) {
                     )
                     tickets.add(ticket)
                 }
+                // Cachear en Room
+                appDao.clearTickets()
+                appDao.clearTicketProductos()
+                appDao.insertTickets(tickets.map { it.ticketToEntity() })
+                tickets.forEach { ticket ->
+                    ticket.productos.forEachIndexed { index, tp ->
+                        appDao.insertTicketProductos(listOf(tp.toEntity(ticket.id, index)))
+                    }
+                }
+                return
             }
         } catch (e: Exception) {
             Log.e("API_PURCH", "cargarCompras failed", e)
+        }
+        // Fallback: leer tickets de Room
+        val cached = appDao.getTickets()
+        if (cached.isNotEmpty()) {
+            tickets = cached.map { entity ->
+                val productos = appDao.getTicketProductosByTicketId(entity.id).map { it.toModel() }
+                entity.toModel(productos)
+            }.toMutableList()
+        }
+    }
+
+    private suspend fun cargarListas(grupoId: String) {
+        if (!isLoggedIn()) {
+            inicializarListas()
+            return
+        }
+        try {
+            val response = apiService.getShoppingLists(grupoId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                val apiLists = response.body()!!.data ?: emptyList()
+                if (apiLists.isNotEmpty()) {
+                    listas.clear()
+                    for (apiList in apiLists) {
+                        val presupuestoId = presupuestos.firstOrNull()?.id ?: ""
+                        val productos = apiList.products.map { prod ->
+                            Producto(
+                                id = prod.productId,
+                                nombre = prod.productName,
+                                codigo = prod.productId,
+                                precio = prod.finalPrice?.toInt() ?: 0,
+                                precioEstimado = prod.finalPrice?.toInt() ?: 0,
+                                cantidad = prod.finalQuantity?.toInt() ?: 1,
+                                comprado = prod.checked,
+                                categoria = Categoria.ESENCIAL
+                            )
+                        }
+                        listas.add(ListaCompra(
+                            id = apiList.id,
+                            nombre = apiList.name,
+                            presupuestoId = presupuestoId,
+                            esFamiliar = presupuestos.any { it.tipo == TipoPresupuesto.FAMILIAR && it.activo },
+                            fechaCreacion = try {
+                                LocalDateTime.parse(apiList.createdAt, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                            } catch (_: Exception) { System.currentTimeMillis() },
+                            total = productos.sumOf { it.precioEstimado * it.cantidad },
+                            productos = productos.toMutableList()
+                        ))
+                    }
+                    persistirListas()
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("API_LIST", "cargarListas failed", e)
+        }
+        // Fallback: keep existing local lists
+        inicializarListas()
+    }
+
+    private suspend fun syncListToApi(lista: ListaCompra): String {
+        if (!isLoggedIn()) return lista.id
+        if (!lista.id.startsWith("lista-")) return lista.id
+
+        val grupoId = grupos.firstOrNull()?.id ?: return lista.id
+        return try {
+            val response = apiService.createShoppingList(CreateShoppingListRequest(
+                groupId = grupoId,
+                name = lista.nombre,
+                description = null
+            ))
+            if (response.isSuccessful && response.body()?.success == true) {
+                response.body()!!.data!!.id
+            } else {
+                lista.id
+            }
+        } catch (e: Exception) {
+            Log.e("API_LIST", "syncListToApi failed", e)
+            lista.id
         }
     }
 
@@ -214,7 +339,7 @@ class AppRepository(private val application: Application) {
         try {
             val response = apiService.getMyGroups()
             if (response.isSuccessful && response.body()?.success == true) {
-                val groupsList = response.body()!!.data ?: emptyList()
+                val groupsList = response.body()?.data ?: emptyList()
                 grupos.clear()
                 for (g in groupsList) {
                     val detailResponse = apiService.getGroupById(g.id)
@@ -223,9 +348,19 @@ class AppRepository(private val application: Application) {
                     }
                 }
                 actualizarUsuariosDesdeGrupos()
+                // Cachear en Room
+                appDao.clearGrupos()
+                appDao.insertGrupos(grupos.map { it.toGrupoEntity() })
+                return
             }
         } catch (e: Exception) {
             Log.e("API_GROUPS", "cargarGrupos failed", e)
+        }
+        // Fallback: leer grupos de Room
+        val cached = appDao.getGrupos()
+        if (cached.isNotEmpty()) {
+            grupos = cached.map { it.toGroupDetailResponse() }.toMutableList()
+            actualizarUsuariosDesdeGrupos()
         }
     }
 
@@ -234,9 +369,16 @@ class AppRepository(private val application: Application) {
             val response = apiService.getMyInvitations()
             if (response.isSuccessful && response.body()?.success == true) {
                 invitaciones = (response.body()!!.data ?: emptyList()).toMutableList()
+                appDao.clearInvitaciones()
+                appDao.insertInvitaciones(invitaciones.map { it.toInvitacionEntity() })
+                return
             }
         } catch (e: Exception) {
             Log.e("API_INVITE", "cargarInvitaciones failed", e)
+        }
+        val cached = appDao.getInvitaciones()
+        if (cached.isNotEmpty()) {
+            invitaciones = cached.map { it.toInvitationResponse() }.toMutableList()
         }
     }
 
@@ -250,22 +392,82 @@ class AppRepository(private val application: Application) {
     }
 
     suspend fun guardarTodo() = withContext(Dispatchers.IO) {
-        // En este punto, preferimos confiar en la API si estamos logueados
-        if (isLoggedIn()) return@withContext 
-
-        appDao.clearTicketProductos()
-        appDao.clearTickets()
+        persistirTickets()
         appDao.clearPresupuestos()
         appDao.clearUsuarios()
-
         appDao.insertPresupuestos(presupuestos.map { it.toEntity() })
+        appDao.insertUsuarios(usuarios.map { it.toEntity() }.toList())
+        persistirListas()
+    }
+
+    private suspend fun persistirListas() {
+        appDao.clearListas()
+        appDao.clearProductos()
+        appDao.insertListas(listas.map { it.toEntity() })
+        listas.forEach { lista ->
+            appDao.insertProductos(lista.productos.map { it.toEntity(lista.id) })
+        }
+    }
+
+    private suspend fun persistirTickets() {
+        appDao.clearTicketProductos()
+        appDao.clearTickets()
         appDao.insertTickets(tickets.map { it.ticketToEntity() })
         tickets.forEach { ticket ->
             ticket.productos.forEachIndexed { index, tp ->
                 appDao.insertTicketProductos(listOf(tp.toEntity(ticket.id, index)))
             }
         }
-        appDao.insertUsuarios(usuarios.map { it.toEntity() }.toList())
+    }
+
+    private suspend fun cargarDesdeCache() {
+        val cachedPresupuestos = appDao.getPresupuestos()
+        if (cachedPresupuestos.isNotEmpty()) {
+            presupuestos = cachedPresupuestos.map { it.toModel() }.toMutableList()
+        }
+        val cachedTickets = appDao.getTickets()
+        if (cachedTickets.isNotEmpty()) {
+            tickets = cachedTickets.map { entity ->
+                val productos = appDao.getTicketProductosByTicketId(entity.id).map { it.toModel() }
+                entity.toModel(productos)
+            }.toMutableList()
+        }
+        val cachedUsuarios = appDao.getUsuarios()
+        if (cachedUsuarios.isNotEmpty()) {
+            val u = cachedUsuarios.first()
+            usuarioActual = Usuario(id = u.id, nombre = u.nombre, email = u.email,
+                rol = try { RolUsuario.valueOf(u.rol) } catch (_: Exception) { RolUsuario.MIEMBRO },
+                activo = u.activo)
+            usuarios = cachedUsuarios.map { ue ->
+                Usuario(id = ue.id, nombre = ue.nombre, email = ue.email,
+                    rol = try { RolUsuario.valueOf(ue.rol) } catch (_: Exception) { RolUsuario.MIEMBRO },
+                    activo = ue.activo)
+            }.toMutableList()
+        }
+        val cachedGrupos = appDao.getGrupos()
+        if (cachedGrupos.isNotEmpty()) {
+            grupos = cachedGrupos.map { it.toGroupDetailResponse() }.toMutableList()
+        }
+        val cachedInvitaciones = appDao.getInvitaciones()
+        if (cachedInvitaciones.isNotEmpty()) {
+            invitaciones = cachedInvitaciones.map { it.toInvitationResponse() }.toMutableList()
+        }
+        val cachedNotifications = appDao.getCachedNotifications()
+        if (cachedNotifications.isNotEmpty()) {
+            notifications = cachedNotifications.map { it.toNotificationResponse() }.toMutableList()
+        }
+        val cachedOffers = appDao.getCachedOffers()
+        if (cachedOffers.isNotEmpty()) {
+            offers = cachedOffers.map { it.toOfferResponse() }.toMutableList()
+        }
+        val cachedListas = appDao.getListas()
+        if (cachedListas.isNotEmpty()) {
+            listas = cachedListas.map { entity ->
+                val productos = appDao.getProductosByListaId(entity.id).map { it.toModel() }
+                entity.toModel(productos)
+            }.toMutableList()
+        }
+        recalcularMontoDisponible()
     }
 
     private fun inicializarDatos() {
@@ -311,7 +513,7 @@ class AppRepository(private val application: Application) {
                         tipo = if (index == 0) TipoPresupuesto.FAMILIAR else TipoPresupuesto.INDIVIDUAL,
                         nombre = b.name,
                         montoTotal = b.totalAmount.toInt(),
-                        montoDisponible = 0, // Se recalcula luego
+                        montoDisponible = 0,
                         fechaInicio = try {
                             LocalDateTime.parse(b.startDate, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                                 .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -326,10 +528,27 @@ class AppRepository(private val application: Application) {
                     )
                     presupuestos.add(presupuesto)
                 }
+                if (presupuestos.none { it.tipo == TipoPresupuesto.INDIVIDUAL }) {
+                    val familiar = presupuestos.first()
+                    presupuestos.add(Presupuesto(
+                        id = "individual_${familiar.id}",
+                        tipo = TipoPresupuesto.INDIVIDUAL,
+                        nombre = "Individual",
+                        montoTotal = familiar.montoTotal,
+                        montoDisponible = 0,
+                        fechaInicio = familiar.fechaInicio,
+                        fechaFin = familiar.fechaFin,
+                        activo = false
+                    ))
+                }
+                appDao.clearPresupuestos()
+                appDao.insertPresupuestos(presupuestos.map { it.toEntity() })
+                return
             }
         } catch (e: Exception) {
             Log.e("API_BUDGET", "loadBudgetsFromApi failed", e)
         }
+        loadDefaultLocalBudgets()
     }
 
     private suspend fun loadDefaultLocalBudgets() {
@@ -386,7 +605,14 @@ class AppRepository(private val application: Application) {
                 appDao.clearUsuarios()
                 appDao.insertUsuarios(listOf(usuario.toEntity()))
                 usuarioActual = usuario
-                cargarTodo() // Recargar todo tras el login exitoso
+                
+                // Intentamos recargar todo, pero capturamos errores para no romper el login
+                try {
+                    cargarTodo()
+                } catch (e: Exception) {
+                    Log.e("AppRepository", "Error al cargar datos tras login", e)
+                }
+
                 Result.success(usuario)
             } else {
                 val msg = response.body()?.message ?: "Error de autenticación"
@@ -418,6 +644,9 @@ class AppRepository(private val application: Application) {
             usuarioActual = null
             grupos.clear()
             invitaciones.clear()
+            notifications.clear()
+            unreadCount = 0
+            offers.clear()
             usuarios.clear()
             presupuestos.clear()
             listas.clear()
@@ -433,9 +662,42 @@ class AppRepository(private val application: Application) {
 
     suspend fun cambiarPresupuestoActivo(id: String) {
         withContext(Dispatchers.IO) {
+            if (presupuestos.none { it.id == id }) {
+                val otroTipo = if (presupuestos.any { it.tipo == TipoPresupuesto.FAMILIAR })
+                    TipoPresupuesto.INDIVIDUAL else TipoPresupuesto.FAMILIAR
+                val existing = presupuestos.firstOrNull()
+                presupuestos.add(Presupuesto(
+                    id = id,
+                    tipo = otroTipo,
+                    nombre = if (otroTipo == TipoPresupuesto.FAMILIAR) "Familiar" else "Individual",
+                    montoTotal = existing?.montoTotal ?: 0,
+                    montoDisponible = 0,
+                    fechaInicio = System.currentTimeMillis(),
+                    fechaFin = null,
+                    activo = false
+                ))
+            }
             val updated = presupuestos.map { it.copy(activo = it.id == id) }
             presupuestos.clear()
             presupuestos.addAll(updated)
+
+            appDao.clearPresupuestos()
+            appDao.insertPresupuestos(presupuestos.map { it.toEntity() })
+
+            if (!id.startsWith("presupuesto-") && !id.startsWith("individual_")) {
+                activarPresupuestoEnApi(id)
+            }
+
+            recalcularMontoDisponible()
+        }
+    }
+
+    private suspend fun activarPresupuestoEnApi(id: String) {
+        if (!isLoggedIn()) return
+        try {
+            apiService.activateBudget(id)
+        } catch (e: Exception) {
+            Log.e("API_BUDGET", "activateBudget failed", e)
         }
     }
 
@@ -462,8 +724,39 @@ class AppRepository(private val application: Application) {
     suspend fun agregarLista(lista: ListaCompra) {
         withContext(Dispatchers.IO) {
             if (listas.none { it.id == lista.id }) {
-                listas.add(lista)
+                val apiId = syncListToApi(lista)
+                val finalLista = if (apiId != lista.id) lista.copy(id = apiId) else lista
+                listas.add(finalLista)
+                appDao.insertListas(listOf(finalLista.toEntity()))
             }
+        }
+    }
+
+    private suspend fun syncProductToApi(listaId: String, producto: Producto, isNew: Boolean) {
+        if (!isLoggedIn()) return
+        val effectiveListId = if (listaId.startsWith("lista-")) return else listaId
+        val productPid = productNameToId[producto.nombre.lowercase()]
+        if (productPid == null) {
+            Log.w("API_LIST", "Producto '${producto.nombre}' no encontrado en catálogo, saltando sync")
+            return
+        }
+        try {
+            if (isNew) {
+                apiService.addProductToList(effectiveListId, AddProductRequest(
+                    productId = productPid,
+                    quantity = producto.cantidad.toDouble(),
+                    notes = null
+                ))
+            } else {
+                apiService.updateProductInList(effectiveListId, producto.id, UpdateProductRequest(
+                    checked = producto.comprado,
+                    finalPrice = producto.precioEstimado.toDouble(),
+                    finalQuantity = producto.cantidad.toDouble(),
+                    notes = null
+                ))
+            }
+        } catch (e: Exception) {
+            Log.e("API_LIST", "syncProductToApi failed", e)
         }
     }
 
@@ -474,10 +767,15 @@ class AppRepository(private val application: Application) {
                 val lista = listas[indexLista]
                 val nuevosProductos = lista.productos.toMutableList()
                 val indexProd = nuevosProductos.indexOfFirst { it.id == producto.id }
-                if (indexProd != -1) nuevosProductos[indexProd] = producto
+                val isNew = indexProd == -1
+                if (!isNew) nuevosProductos[indexProd] = producto
                 else nuevosProductos.add(producto)
                 
                 listas[indexLista] = lista.copy(productos = nuevosProductos, total = nuevosProductos.sumOf { it.precioEstimado * it.cantidad })
+                appDao.deleteProductosByListaId(listaId)
+                appDao.insertProductos(nuevosProductos.map { it.toEntity(listaId) })
+
+                syncProductToApi(listaId, producto, isNew)
             }
         }
     }
@@ -490,6 +788,16 @@ class AppRepository(private val application: Application) {
                 val nuevosProductos = lista.productos.toMutableList()
                 nuevosProductos.removeAll { it.id == productoId }
                 listas[indexLista] = lista.copy(productos = nuevosProductos)
+                appDao.deleteProductosByListaId(listaId)
+                appDao.insertProductos(nuevosProductos.map { it.toEntity(listaId) })
+
+                if (isLoggedIn() && !listaId.startsWith("lista-")) {
+                    try {
+                        apiService.deleteProductFromList(listaId, productoId)
+                    } catch (e: Exception) {
+                        Log.e("API_LIST", "eliminarProducto API failed", e)
+                    }
+                }
             }
         }
     }
@@ -505,8 +813,21 @@ class AppRepository(private val application: Application) {
             if (indexProd == -1) return@withContext
 
             val producto = nuevosProductos[indexProd]
-            nuevosProductos[indexProd] = producto.copy(comprado = !producto.comprado)
+            val updated = producto.copy(comprado = !producto.comprado)
+            nuevosProductos[indexProd] = updated
             listas[indexLista] = lista.copy(productos = nuevosProductos)
+            appDao.deleteProductosByListaId(listaId)
+            appDao.insertProductos(nuevosProductos.map { it.toEntity(listaId) })
+
+            if (isLoggedIn() && !listaId.startsWith("lista-")) {
+                try {
+                    apiService.updateProductInList(listaId, productoId, UpdateProductRequest(
+                        checked = updated.comprado
+                    ))
+                } catch (e: Exception) {
+                    Log.e("API_LIST", "toggleProducto API failed", e)
+                }
+            }
         }
     }
 
@@ -522,25 +843,27 @@ class AppRepository(private val application: Application) {
             } else ticket
 
             tickets.add(0, ticketVinculado)
-            
-            // Sincronizar con backend si es posible
+            persistirTickets()
+
             if (!ticketVinculado.presupuestoId.startsWith("presupuesto-")) {
                 try {
                     val items = ticketVinculado.productos.mapNotNull { tp ->
-                        val pid = productNameToId[tp.nombre.lowercase()] ?: return@mapNotNull null
-                        CreatePurchaseItem(pid, tp.cantidad)
+                        val pid = productNameToId[tp.nombre.lowercase()]
+                        if (pid != null) CreatePurchaseItem(pid, tp.cantidad) else null
                     }
+                    val groupId = grupos.firstOrNull()?.id ?: return@withContext
+                    val storeId = storeNameToId[ticketVinculado.supermercado.lowercase()]
                     if (items.isNotEmpty()) {
-                        val groupId = grupos.firstOrNull()?.id ?: return@withContext
-                        val storeId = storeNameToId[ticketVinculado.supermercado.lowercase()]
                         apiService.createPurchase(CreatePurchaseRequest(groupId, storeId, if (storeId == null) ticketVinculado.supermercado else null, items))
                         Log.d("API_PURCH", "Ticket sincronizado con éxito")
+                    } else {
+                        Log.w("API_PURCH", "Ticket guardado localmente (sin productos compatibles con API)")
                     }
                 } catch (e: Exception) {
-                    Log.w("API_PURCH", "Fallo al sincronizar ticket", e)
+                    Log.w("API_PURCH", "Fallo al sincronizar ticket, guardado en Room", e)
                 }
             }
-            
+
             recalcularMontoDisponible()
         }
     }
@@ -548,6 +871,7 @@ class AppRepository(private val application: Application) {
     suspend fun eliminarTicket(id: String) {
         withContext(Dispatchers.IO) {
             tickets.removeAll { it.id == id }
+            persistirTickets()
             try {
                 apiService.deletePurchase(id)
             } catch (_: Exception) {}
@@ -560,6 +884,7 @@ class AppRepository(private val application: Application) {
             val index = tickets.indexOfFirst { it.id == ticket.id }
             if (index != -1) {
                 tickets[index] = ticket
+                persistirTickets()
                 recalcularMontoDisponible()
             }
         }
@@ -580,9 +905,36 @@ class AppRepository(private val application: Application) {
             if (usuario.id == usuarioActual?.id) {
                 usuarioActual = usuario
                 try {
-                    apiService.updateProfile(mapOf("fullName" to usuario.nombre))
+                    val body = mutableMapOf("fullName" to usuario.nombre)
+                    body["email"] = usuario.email
+                    val response = apiService.updateProfile(body)
+                    if (response.isSuccessful) {
+                        response.body()?.data?.let { profile ->
+                            usuarioActual = Usuario(
+                                id = profile.id,
+                                nombre = profile.fullName,
+                                email = profile.email,
+                                rol = if (profile.role == "ADMIN") RolUsuario.ADMIN else RolUsuario.MIEMBRO,
+                                activo = true
+                            )
+                        }
+                    }
                 } catch (_: Exception) {}
             }
+        }
+    }
+
+    suspend fun cambiarPassword(currentPassword: String, newPassword: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.changePassword(mapOf("currentPassword" to currentPassword, "newPassword" to newPassword))
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()!!.data?.get("message") ?: "Contraseña actualizada")
+            } else {
+                val msg = response.body()?.message ?: "Error al cambiar la contraseña"
+                Result.failure(Exception(msg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
@@ -598,8 +950,139 @@ class AppRepository(private val application: Application) {
                     rol = if (profile.role == "ADMIN") RolUsuario.ADMIN else RolUsuario.MIEMBRO,
                     activo = true
                 )
+                appDao.clearUsuarios()
+                appDao.insertUsuarios(listOf(usuarioActual!!.toEntity()))
+                return
             }
         } catch (_: Exception) {}
+        // Fallback: leer usuario de Room
+        val cached = appDao.getUsuarios()
+        if (cached.isNotEmpty()) {
+            val u = cached.first()
+            usuarioActual = Usuario(id = u.id, nombre = u.nombre, email = u.email,
+                rol = try { RolUsuario.valueOf(u.rol) } catch (_: Exception) { RolUsuario.MIEMBRO },
+                activo = u.activo)
+        }
+    }
+
+    suspend fun crearGrupo(nombre: String, categoria: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.createGroup(CreateGroupRequest(nombre, categoria = categoria))
+            if (response.isSuccessful && response.body()?.success == true) {
+                cargarGrupos()
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al crear grupo"))
+            }
+        } catch (e: Exception) {
+            Log.e("API_GROUPS", "crearGrupo failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun cambiarGrupoActivo(grupoId: String) = withContext(Dispatchers.IO) {
+        val grupo = grupos.find { it.id == grupoId } ?: return@withContext
+        loadBudgetsFromApi(grupoId)
+        cargarCompras(grupoId)
+        cargarListas(grupoId)
+        recalcularMontoDisponible()
+    }
+
+    var notifications = mutableListOf<NotificationResponse>()
+    var unreadCount = 0
+    var offers = mutableListOf<OfferResponse>()
+
+    suspend fun loadActiveOffers() = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getActiveOffers()
+            if (response.isSuccessful && response.body()?.success == true) {
+                offers = (response.body()?.data ?: emptyList()).toMutableList()
+                appDao.clearCachedOffers()
+                appDao.insertCachedOffers(offers.map { o ->
+                    OfferCacheEntity(
+                        id = o.id, storeId = o.storeId, storeName = o.storeName,
+                        title = o.title, description = o.description,
+                        discountType = o.discountType, discountValue = o.discountValue,
+                        startDate = o.startDate ?: "", endDate = o.endDate ?: "",
+                        imageUrl = o.imageUrl
+                    )
+                })
+                return@withContext
+            }
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Error loading offers", e)
+        }
+        val cached = appDao.getCachedOffers()
+        if (cached.isNotEmpty()) {
+            offers = cached.map { it.toOfferResponse() }.toMutableList()
+        }
+    }
+
+    suspend fun loadNotifications() = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getNotifications()
+            if (response.isSuccessful && response.body()?.success == true) {
+                notifications = (response.body()?.data ?: emptyList()).toMutableList()
+                appDao.clearCachedNotifications()
+                appDao.insertCachedNotifications(notifications.map { n ->
+                    NotificationCacheEntity(
+                        id = n.id, type = n.type, title = n.title,
+                        message = n.message, data = n.data, read = n.read,
+                        createdAt = n.createdAt
+                    )
+                })
+                return@withContext
+            }
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Error loading notifications", e)
+        }
+        val cached = appDao.getCachedNotifications()
+        if (cached.isNotEmpty()) {
+            notifications = cached.map { it.toNotificationResponse() }.toMutableList()
+        }
+    }
+
+    suspend fun loadUnreadCount() = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getUnreadNotificationsCount()
+            if (response.isSuccessful && response.body()?.success == true) {
+                unreadCount = response.body()?.data?.count ?: 0
+            }
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Error loading unread count", e)
+        }
+    }
+
+    suspend fun markNotificationRead(id: String) = withContext(Dispatchers.IO) {
+        try {
+            apiService.markNotificationRead(id)
+            val idx = notifications.indexOfFirst { it.id == id }
+            if (idx >= 0) {
+                notifications[idx] = notifications[idx].copy(read = true)
+                unreadCount = (unreadCount - 1).coerceAtLeast(0)
+            }
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Error marking notification read", e)
+        }
+    }
+
+    suspend fun markAllNotificationsRead() = withContext(Dispatchers.IO) {
+        try {
+            apiService.markAllNotificationsRead()
+            notifications = notifications.map { it.copy(read = true) }.toMutableList()
+            unreadCount = 0
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Error marking all notifications read", e)
+        }
+    }
+
+    suspend fun deleteNotification(id: String) = withContext(Dispatchers.IO) {
+        try {
+            apiService.deleteNotification(id)
+            notifications.removeAll { it.id == id }
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Error deleting notification", e)
+        }
     }
 
     suspend fun inviteMember(groupId: String, email: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -615,23 +1098,276 @@ class AppRepository(private val application: Application) {
         }
     }
 
-    suspend fun acceptInvitation(token: String) = withContext(Dispatchers.IO) {
-        apiService.acceptInvitation(token)
+    suspend fun acceptInvitation(token: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.acceptInvitation(token)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al aceptar invitación"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
-    suspend fun rejectInvitation(token: String) = withContext(Dispatchers.IO) {
-        apiService.rejectInvitation(token)
+    suspend fun rejectInvitation(token: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.rejectInvitation(token)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al rechazar invitación"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun updateThemeMode(mode: ThemeMode) {
         themeMode = mode
+        preferencesDataStore.saveThemeMode(mode)
+    }
+
+    suspend fun loadBudgetProgress(groupId: String): Result<List<BudgetProgress>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getBudgetProgress(groupId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data ?: emptyList())
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al cargar progreso del presupuesto"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadSpendingByCategory(groupId: String): Result<List<SpendingByCategory>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getSpendingByCategory(groupId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data ?: emptyList())
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al cargar gastos por categoría"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadSpendingByStore(groupId: String): Result<List<SpendingByStore>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getSpendingByStore(groupId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data ?: emptyList())
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al cargar gastos por tienda"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadSpendingByImportance(groupId: String): Result<List<SpendingByImportance>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getSpendingByImportance(groupId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data ?: emptyList())
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al cargar gastos por importancia"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadStoreFrequency(groupId: String): Result<List<StoreFrequency>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getMostFrequentStore(groupId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data ?: emptyList())
+            } else {
+                // Fallback local calculation
+                val groupTickets = tickets.filter { it.presupuestoId == groupId }
+                if (groupTickets.isEmpty()) return@withContext Result.success(emptyList())
+                
+                val totalSpent = groupTickets.sumOf { it.total }.toDouble()
+                val stats = groupTickets.groupBy { it.supermercado }
+                    .map { (name, list) ->
+                        val spent = list.sumOf { it.total }.toDouble()
+                        StoreFrequency(null, name, list.size, spent, (spent/totalSpent)*100)
+                    }
+                    .sortedByDescending { it.purchaseCount }
+                Result.success(stats)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadMostPurchasedProducts(groupId: String): Result<List<MostPurchasedProduct>> = withContext(Dispatchers.IO) {
+        try {
+            val groupTickets = tickets.filter { it.presupuestoId == groupId }
+            val products = groupTickets.flatMap { it.productos }
+            val stats = products.groupBy { it.nombre }
+                .map { (name, list) ->
+                    MostPurchasedProduct(name, list.sumOf { it.cantidad }, list.sumOf { (it.precio * it.cantidad).toDouble() })
+                }
+                .sortedByDescending { it.count }
+                .take(5)
+            Result.success(stats)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadMemberSpending(groupId: String): Result<List<MemberSpending>> = withContext(Dispatchers.IO) {
+        try {
+            // Nota: El modelo Ticket actual no tiene userId, pero el backend sí lo maneja.
+            // Por ahora devolvemos vacío o intentamos cargar de una API si existiera.
+            Result.success(emptyList())
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun loadMonthlySummary(groupId: String): Result<List<MonthlySummary>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getMonthlySummary(groupId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data ?: emptyList())
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al cargar resumen mensual"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun aiSuggestOffers(productNames: List<String>, storeId: String? = null): Result<List<AiOfferSuggestion>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.aiSuggestOffers(AiOfferSuggestionRequest(productNames, storeId))
+            if (response.isSuccessful && response.body()?.success == true) {
+                val suggestions = response.body()?.data?.suggestions ?: emptyList()
+                Result.success(suggestions)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Error al obtener sugerencias IA"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis = withContext(Dispatchers.IO) {
-        // TODO: Implementar análisis de imagen (OCR/AI)
-        TicketImageAnalysis(null, null, null, emptyList())
+        try {
+            val base64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+            val request = AnalyzeTicketImageRequest(imageBase64 = base64, mimeType = mimeType)
+            val response = apiService.analyzeTicketImage(request)
+            if (response.isSuccessful && response.body()?.success == true) {
+                val data = response.body()?.data
+                TicketImageAnalysis(
+                    storeName = data?.storeName,
+                    purchaseDate = data?.purchaseDate,
+                    total = data?.total?.toInt(),
+                    products = data?.products?.map { p ->
+                        TicketProducto(
+                            nombre = p.name,
+                            precio = (p.totalPrice ?: p.unitPrice ?: 0.0).toInt(),
+                            cantidad = (p.quantity ?: 1.0).toInt()
+                        )
+                    } ?: emptyList()
+                )
+            } else {
+                TicketImageAnalysis(null, null, null, emptyList())
+            }
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Error analyzing ticket image", e)
+            TicketImageAnalysis(null, null, null, emptyList())
+        }
     }
 }
+
+// ======================
+// HELPER: JSON serialize/deserialize for GroupMemberResponse
+// ======================
+
+private fun List<GroupMemberResponse>.toMembersJson(): String = JSONArray(
+    map { member ->
+        JSONObject().apply {
+            put("id", member.id)
+            put("fullName", member.fullName)
+            put("email", member.email)
+            put("role", member.role)
+            put("joinedAt", member.joinedAt)
+        }
+    }
+).toString()
+
+private fun String.parseMembers(): List<GroupMemberResponse> = try {
+    val arr = JSONArray(this)
+    (0 until arr.length()).map { i ->
+        val obj = arr.getJSONObject(i)
+        GroupMemberResponse(
+            id = obj.getString("id"),
+            fullName = obj.getString("fullName"),
+            email = obj.getString("email"),
+            role = obj.getString("role"),
+            joinedAt = obj.optString("joinedAt", "")
+        )
+    }
+} catch (_: Exception) { emptyList() }
+
+// ======================
+// GROUP <-> ROOM MAPPING
+// ======================
+
+private fun GroupDetailResponse.toGrupoEntity() = GrupoEntity(
+    id = id,
+    name = name,
+    description = description,
+    categoria = categoria ?: "FAMILIA",
+    createdBy = createdBy,
+    membersJson = members.toMembersJson(),
+    createdAt = createdAt
+)
+
+private fun GrupoEntity.toGroupDetailResponse() = GroupDetailResponse(
+    id = id,
+    name = name,
+    description = description,
+    categoria = categoria ?: "FAMILIA",
+    createdBy = createdBy,
+    members = membersJson.parseMembers(),
+    createdAt = createdAt
+)
+
+// ======================
+// INVITATION <-> ROOM MAPPING
+// ======================
+
+private fun InvitationResponse.toInvitacionEntity() = InvitacionEntity(
+    id = id,
+    groupId = groupId,
+    groupName = groupName,
+    invitedBy = invitedBy,
+    invitedByEmail = invitedByEmail,
+    status = status,
+    token = token,
+    expiresAt = expiresAt,
+    createdAt = createdAt
+)
+
+private fun InvitacionEntity.toInvitationResponse() = InvitationResponse(
+    id = id,
+    groupId = groupId,
+    groupName = groupName,
+    invitedBy = invitedBy,
+    invitedByEmail = invitedByEmail,
+    status = status,
+    token = token,
+    expiresAt = expiresAt,
+    createdAt = createdAt
+)
 
 // ======================
 // MAPPING EXTENSIONS
@@ -677,4 +1413,44 @@ private fun GroupMemberResponse.toUsuario() = Usuario(
     id = id, nombre = fullName, email = email,
     rol = if (role == "ADMIN") RolUsuario.ADMIN else RolUsuario.MIEMBRO,
     activo = true
+)
+
+private fun ListaCompra.toEntity() = com.undef.superahorrosanchezpucci.data.local.ListaCompraEntity(
+    id = id, nombre = nombre, presupuestoId = presupuestoId, esFamiliar = esFamiliar,
+    fechaCreacion = fechaCreacion, hora = hora, supermercado = supermercado, total = total
+)
+
+private fun com.undef.superahorrosanchezpucci.data.local.ListaCompraEntity.toModel(productos: List<com.undef.superahorrosanchezpucci.data.model.Producto>) = ListaCompra(
+    id = id, nombre = nombre, presupuestoId = presupuestoId, esFamiliar = esFamiliar,
+    fechaCreacion = fechaCreacion, hora = hora, supermercado = supermercado, total = total,
+    productos = productos.toMutableList()
+)
+
+private fun com.undef.superahorrosanchezpucci.data.model.Producto.toEntity(listaId: String) = com.undef.superahorrosanchezpucci.data.local.ProductoEntity(
+    id = id, listaId = listaId, codigo = codigo, nombre = nombre, descripcion = descripcion,
+    precio = precio, marca = marca, precioEstimado = precioEstimado, precioReal = precioReal,
+    cantidad = cantidad, comprado = comprado, categoria = categoria.name
+)
+
+// ======================
+// CACHE ENTITY MAPPINGS
+// ======================
+
+private fun com.undef.superahorrosanchezpucci.data.local.NotificationCacheEntity.toNotificationResponse() = NotificationResponse(
+    id = id, type = type, title = title, message = message,
+    data = data, read = read, createdAt = createdAt
+)
+
+private fun com.undef.superahorrosanchezpucci.data.local.OfferCacheEntity.toOfferResponse() = OfferResponse(
+    id = id, storeId = storeId, storeName = storeName,
+    title = title, description = description,
+    discountType = discountType, discountValue = discountValue,
+    startDate = startDate, endDate = endDate,
+    imageUrl = imageUrl
+)
+
+private fun com.undef.superahorrosanchezpucci.data.local.ProductoEntity.toModel() = com.undef.superahorrosanchezpucci.data.model.Producto(
+    id = id, codigo = codigo, nombre = nombre, descripcion = descripcion, precio = precio,
+    marca = marca, precioEstimado = precioEstimado, precioReal = precioReal,
+    cantidad = cantidad, comprado = comprado, categoria = try { com.undef.superahorrosanchezpucci.data.model.Categoria.valueOf(categoria) } catch (_: Exception) { com.undef.superahorrosanchezpucci.data.model.Categoria.ESENCIAL }
 )

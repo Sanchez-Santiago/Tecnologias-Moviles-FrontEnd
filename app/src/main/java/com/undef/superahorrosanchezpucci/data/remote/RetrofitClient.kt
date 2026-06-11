@@ -82,8 +82,7 @@ object RetrofitClient {
                                 else {
                                     val newAccess = apiResp.data["accessToken"] as? String ?: return@authenticator null
                                     val newRefresh = apiResp.data["refreshToken"] as? String ?: return@authenticator null
-                                    AuthSessionStore.accessToken = newAccess
-                                    AuthSessionStore.refreshToken = newRefresh
+                                    AuthSessionStore.save(newAccess, newRefresh)
                                     response.request.newBuilder()
                                         .header("Authorization", "Bearer $newAccess")
                                         .build()

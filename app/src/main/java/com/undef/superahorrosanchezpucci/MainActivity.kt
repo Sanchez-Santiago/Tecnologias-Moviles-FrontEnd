@@ -41,7 +41,9 @@ import com.undef.superahorrosanchezpucci.viewmodel.FamilyViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.HomeViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ListaViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.OfertasViewModel
+import com.undef.superahorrosanchezpucci.viewmodel.NotificationsViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ProfileViewModel
+import com.undef.superahorrosanchezpucci.viewmodel.StatisticsViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.ThemeViewModel
 import com.undef.superahorrosanchezpucci.viewmodel.TicketsViewModel
 
@@ -107,7 +109,10 @@ fun MainScreen() {
             composable("HISTORIAL") {
                 HistorialScreen(navController, ticketsState)
             }
-            composable("ESTADISTICAS") { EstadisticasScreen(navController) }
+            composable("ESTADISTICAS") {
+                val statisticsViewModel: StatisticsViewModel = viewModel()
+                EstadisticasScreen(statisticsViewModel)
+            }
             composable("TICKETS") { TicketsScreen(ticketsViewModel) }
             composable("OFERTAS") {
                 val ofertasViewModel: OfertasViewModel = viewModel()
@@ -118,10 +123,12 @@ fun MainScreen() {
                 ProfileScreen(profileViewModel, navController)
             }
             composable("SETTINGS") {
-                val themeViewModel: ThemeViewModel = viewModel()
-                SettingsScreen(navController, themeViewModel)
+                SettingsScreen(navController)
             }
-            composable("NOTIFICACIONES") { NotificationsScreen() }
+            composable("NOTIFICACIONES") {
+                val notificationsViewModel: NotificationsViewModel = viewModel()
+                NotificationsScreen(notificationsViewModel)
+            }
             composable("FAMILIA") {
                 val familyViewModel: FamilyViewModel = viewModel()
                 FamilyMembersScreen(familyViewModel, onBack = { navController.popBackStack() })

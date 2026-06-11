@@ -10,7 +10,6 @@ import com.undef.superahorrosanchezpucci.data.model.Ticket
 import com.undef.superahorrosanchezpucci.data.model.TicketProducto
 import com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto
 import com.undef.superahorrosanchezpucci.data.model.Usuario
-import com.undef.superahorrosanchezpucci.ui.theme.ThemeMode
 
 fun Presupuesto.toEntity() = PresupuestoEntity(
     id = id,
@@ -139,6 +138,3 @@ fun UsuarioEntity.toModel() = Usuario(
     activo = activo
 )
 
-fun ThemeMode.toEntity() = AppConfigEntity(themeMode = name)
-
-fun AppConfigEntity.toThemeMode() = enumValueOf<ThemeMode>(themeMode)

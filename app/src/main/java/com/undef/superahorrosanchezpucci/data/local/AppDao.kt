@@ -26,9 +26,6 @@ interface AppDao {
     @Query("SELECT * FROM usuarios")
     suspend fun getUsuarios(): List<UsuarioEntity>
 
-    @Query("SELECT * FROM app_config WHERE id = 'config' LIMIT 1")
-    suspend fun getConfig(): AppConfigEntity?
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPresupuestos(items: List<PresupuestoEntity>)
 
@@ -46,9 +43,6 @@ interface AppDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUsuarios(items: List<UsuarioEntity>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertConfig(config: AppConfigEntity)
 
     @Query("DELETE FROM presupuestos")
     suspend fun clearPresupuestos()
@@ -98,29 +92,51 @@ interface AppDao {
     @Query("SELECT * FROM ticket_productos WHERE ticketId = :ticketId")
     suspend fun getTicketProductosByTicketId(ticketId: String): List<TicketProductoEntity>
 
-    @Transaction
-    suspend fun replaceAll(
-        presupuestos: List<PresupuestoEntity>,
-        listas: List<ListaCompraEntity>,
-        productos: List<ProductoEntity>,
-        tickets: List<TicketEntity>,
-        ticketProductos: List<TicketProductoEntity>,
-        usuarios: List<UsuarioEntity>,
-        config: AppConfigEntity
-    ) {
-        clearTicketProductos()
-        clearProductos()
-        clearTickets()
-        clearListas()
-        clearPresupuestos()
-        clearUsuarios()
+    // Grupos
+    @Query("SELECT * FROM grupos")
+    suspend fun getGrupos(): List<GrupoEntity>
 
-        insertPresupuestos(presupuestos)
-        insertListas(listas)
-        insertProductos(productos)
-        insertTickets(tickets)
-        insertTicketProductos(ticketProductos)
-        insertUsuarios(usuarios)
-        insertConfig(config)
-    }
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGrupos(items: List<GrupoEntity>)
+
+    @Query("DELETE FROM grupos")
+    suspend fun clearGrupos()
+
+    // Invitaciones
+    @Query("SELECT * FROM invitaciones")
+    suspend fun getInvitaciones(): List<InvitacionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInvitaciones(items: List<InvitacionEntity>)
+
+    @Query("DELETE FROM invitaciones")
+    suspend fun clearInvitaciones()
+
+    // Notifications cache
+    @Query("SELECT * FROM notifications_cache ORDER BY createdAt DESC")
+    suspend fun getCachedNotifications(): List<NotificationCacheEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCachedNotifications(items: List<NotificationCacheEntity>)
+
+    @Query("DELETE FROM notifications_cache")
+    suspend fun clearCachedNotifications()
+
+    // Offers cache
+    @Query("SELECT * FROM offers_cache")
+    suspend fun getCachedOffers(): List<OfferCacheEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCachedOffers(items: List<OfferCacheEntity>)
+
+    @Query("DELETE FROM offers_cache")
+    suspend fun clearCachedOffers()
+
+    // Lista de compra productos
+    @Query("SELECT * FROM productos WHERE listaId = :listaId")
+    suspend fun getProductosByListaId(listaId: String): List<ProductoEntity>
+
+    @Query("DELETE FROM productos WHERE listaId = :listaId")
+    suspend fun deleteProductosByListaId(listaId: String)
+
 }

@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -169,24 +172,7 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
                             isDark = isDark,
                             onClick = { navController?.navigate("SETTINGS") }
                         )
-                        SettingsItem(
-                            Icons.Default.Security, 
-                            "Privacidad", 
-                            "Maneja tus datos",
-                            isDark = isDark,
-                            onClick = { 
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Próximamente")
-                                }
-                            }
-                        )
-                        SettingsItem(
-                            Icons.Default.Help,
-                            "Ayuda y Soporte",
-                            "Centro de asistencia",
-                            isDark = isDark,
-                            onClick = { }
-                        )
+
                         SettingsItem(
                             Icons.Default.Logout,
                             "Cerrar Sesión",
@@ -208,17 +194,27 @@ fun ProfileScreen(viewModel: ProfileViewModel, navController: NavController? = n
         }
         
         if (showEditProfile) {
-            EditProfileModal(
-                initialName = usuarioActual?.nombre ?: "",
-                onClose = { showEditProfile = false },
-                onSave = { newName ->
-                    val user = usuarioActual
-                    if (user != null) {
-                        viewModel.actualizarUsuario(user.copy(nombre = newName))
+            val user = usuarioActual
+            if (user != null) {
+                EditProfileModal(
+                    initialName = user.nombre,
+                    initialEmail = user.email,
+                    onClose = { showEditProfile = false },
+                    onSave = { newName, newEmail, currentPassword, newPassword ->
+                        scope.launch {
+                            viewModel.actualizarUsuario(user.copy(nombre = newName, email = newEmail))
+                            if (currentPassword.isNotBlank() && newPassword.isNotBlank()) {
+                                viewModel.cambiarPassword(currentPassword, newPassword)
+                                    .onSuccess { snackbarHostState.showSnackbar("Perfil y contraseña actualizados") }
+                                    .onFailure { snackbarHostState.showSnackbar("Error: ${it.message}") }
+                            } else {
+                                snackbarHostState.showSnackbar("Perfil actualizado correctamente")
+                            }
+                            showEditProfile = false
+                        }
                     }
-                    showEditProfile = false
-                }
-            )
+                )
+            }
         }
     }
 }
@@ -446,8 +442,16 @@ fun SettingsItem(
 }
 
 @Composable
-fun EditProfileModal(initialName: String, onClose: () -> Unit, onSave: (String) -> Unit) {
+fun EditProfileModal(
+    initialName: String,
+    initialEmail: String,
+    onClose: () -> Unit,
+    onSave: (name: String, email: String, currentPassword: String, newPassword: String) -> Unit
+) {
     var name by remember { mutableStateOf(initialName) }
+    var email by remember { mutableStateOf(initialEmail) }
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
     
     Box(
         modifier = Modifier
@@ -463,10 +467,15 @@ fun EditProfileModal(initialName: String, onClose: () -> Unit, onSave: (String) 
             shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.cardColors(containerColor = Slate900)
         ) {
-            Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier
+                    .padding(32.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text("Editar Perfil", color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -478,13 +487,70 @@ fun EditProfileModal(initialName: String, onClose: () -> Unit, onSave: (String) 
                         focusedBorderColor = Emerald500,
                         unfocusedBorderColor = Slate700,
                         cursorColor = Emerald500
-                    )
+                    ),
+                    singleLine = true
                 )
-                
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email", color = Slate400) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = White,
+                        unfocusedTextColor = White,
+                        focusedBorderColor = Emerald500,
+                        unfocusedBorderColor = Slate700,
+                        cursorColor = Emerald500
+                    ),
+                    singleLine = true
+                )
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
+                Text("Cambiar contraseña (opcional)", color = Slate500, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = currentPassword,
+                    onValueChange = { currentPassword = it },
+                    label = { Text("Contraseña actual", color = Slate400) },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = White,
+                        unfocusedTextColor = White,
+                        focusedBorderColor = Emerald500,
+                        unfocusedBorderColor = Slate700,
+                        cursorColor = Emerald500
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    label = { Text("Nueva contraseña", color = Slate400) },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = White,
+                        unfocusedTextColor = White,
+                        focusedBorderColor = Emerald500,
+                        unfocusedBorderColor = Slate700,
+                        cursorColor = Emerald500
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Button(
-                    onClick = { onSave(name) },
+                    onClick = { onSave(name, email, currentPassword, newPassword) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
                     shape = RoundedCornerShape(16.dp)
