@@ -2,6 +2,8 @@ package com.undef.superahorrosanchezpucci.data.remote
 
 import com.undef.superahorrosanchezpucci.data.remote.dto.ApiResponse
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonDeserializer
 import com.google.gson.reflect.TypeToken
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -98,10 +100,20 @@ object RetrofitClient {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
+            val gsonWithAdapter = GsonBuilder()
+                .registerTypeHierarchyAdapter(Double::class.java, JsonDeserializer<Double> { json, _, _ ->
+                    when {
+                        json.isJsonPrimitive && json.asJsonPrimitive.isString -> json.asString.toDoubleOrNull() ?: 0.0
+                        json.isJsonPrimitive && json.asJsonPrimitive.isNumber -> json.asNumber.toDouble()
+                        else -> null
+                    }
+                })
+                .create()
+
             val retrofit = Retrofit.Builder()
                 .baseUrl("https://tecnologias-moviles-backend.onrender.com/") // Placeholder
                 .client(client)
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create(gsonWithAdapter))
                 .build()
 
             apiService = retrofit.create(ApiService::class.java)

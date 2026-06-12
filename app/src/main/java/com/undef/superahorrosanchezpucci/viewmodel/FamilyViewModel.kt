@@ -32,6 +32,7 @@ class FamilyViewModel(application: Application) : AndroidViewModel(application) 
 
     fun crearGrupo(nombre: String, categoria: String) {
         store.crearGrupo(nombre, categoria) { result ->
+            result.onSuccess { _successMsg.value = "Grupo '$nombre' creado con éxito" }
             result.onFailure { _error.value = it.message }
         }
     }

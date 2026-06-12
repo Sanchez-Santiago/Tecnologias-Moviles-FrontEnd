@@ -45,11 +45,14 @@ fun HomeScreen(
 ) {
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
     val allTickets by viewModel.tickets.collectAsStateWithLifecycle()
+    val listas by viewModel.listas.collectAsStateWithLifecycle()
     val usuarios by viewModel.usuarios.collectAsStateWithLifecycle()
     val grupos by viewModel.grupos.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val usuarioActual by viewModel.usuarioActual.collectAsStateWithLifecycle()
     val unreadCount by viewModel.unreadCount.collectAsStateWithLifecycle()
+    val isModoIndividual by viewModel.modoIndividual.collectAsStateWithLifecycle()
+    val grupoActivoId by viewModel.grupoActivoId.collectAsStateWithLifecycle()
     
     // Stats for detailed view at bottom
     val spendingByStore by viewModel.spendingByStore.collectAsStateWithLifecycle()
@@ -65,9 +68,8 @@ fun HomeScreen(
         .sortedByDescending { it.fechaHora }
         .take(3)
 
-    val grupoId = grupos.firstOrNull()?.id
-    LaunchedEffect(grupoId) {
-        grupoId?.let { viewModel.loadStats(it) }
+    LaunchedEffect(grupoActivoId) {
+        grupoActivoId?.let { viewModel.loadStats(it) }
     }
 
     // Calculate budget warning state
@@ -86,40 +88,66 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        if (isLoading) {
-            HomeSkeleton()
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(32.dp),
-                contentPadding = PaddingValues(bottom = 100.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(8.dp)) }
+        // No usaremos Box con fillMaxSize aquí si dentro hay un LazyColumn con scroll infinito.
+        // La causa del crash es medir un componente con altura infinita.
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+            contentPadding = PaddingValues(bottom = 100.dp)
+        ) {
+            item { Spacer(modifier = Modifier.height(8.dp)) }
 
-                if (grupos.isNotEmpty()) {
-                    item {
-                        GroupSelector(
-                            grupos = grupos,
-                            onGroupSelected = { grupoId -> viewModel.cambiarGrupoActivo(grupoId) }
-                        )
-                    }
-                }
-                
-                item { 
+            item {
+                GroupSelector(
+                    grupos = grupos,
+                    selectedGroupId = grupoActivoId,
+                    onGroupSelected = { grupoId -> viewModel.cambiarGrupoActivo(grupoId) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            
+            if (isLoading) {
+                // Modo loading: mostramos el selector de modo activo y el esqueleto debajo
+                item {
                     ModeSelector(
-                        activeId = presupuestoActivo?.id ?: "",
-                        presupuestos = presupuestos,
-                        onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
-                    ) 
+                        isModoIndividual = isModoIndividual,
+                        onModeChange = { individual -> 
+                            viewModel.cambiarModo(individual) { result ->
+                                if (result.isFailure) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(result.exceptionOrNull()?.message ?: "Error al cambiar de modo")
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+                item {
+                    HomeSkeleton()
+                }
+            } else {
+                item {
+                    ModeSelector(
+                        isModoIndividual = isModoIndividual,
+                        onModeChange = { individual -> 
+                            viewModel.cambiarModo(individual) { result ->
+                                if (result.isFailure) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(result.exceptionOrNull()?.message ?: "Error al cambiar de modo")
+                                    }
+                                }
+                            }
+                        }
+                    )
                 }
 
                 item {
                     val presupuesto = presupuestoActivo
-                    val listaId = if (presupuesto?.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR) "lista-familiar" else "lista-individual"
-                    val estimados = if (presupuesto != null) viewModel.getEstimadosPorCategoria(listaId) else emptyMap()
+                    val lista = listas.find { it.presupuestoId == presupuesto?.id }
+                    val estimados = if (lista != null) viewModel.getEstimadosPorCategoria(lista.id) else emptyMap()
 
                     BudgetHero(
                         presupuesto = presupuesto,
@@ -143,7 +171,7 @@ fun HomeScreen(
                 }
 
                 item { 
-                    val totalGastado = allTickets.sumOf { it.total }
+                    val totalGastado = allTickets.filter { it.presupuestoId == presupuestoActivo?.id }.sumOf { it.total }
                     AccumulatedSavingsCard(totalGastado) 
                 }
 
@@ -382,14 +410,7 @@ fun Header(userName: String, onNotificationsClick: () -> Unit, unreadCount: Int 
 }
 
 @Composable
-fun ModeSelector(activeId: String, presupuestos: List<Presupuesto>, onModeChange: (String) -> Unit) {
-    val familiar = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.FAMILIAR }
-    val individual = presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.INDIVIDUAL }
-
-    val familiarId = familiar?.id
-    val individualId = individual?.id
-    val isIndividual = activeId == individualId
-
+fun ModeSelector(isModoIndividual: Boolean, onModeChange: (Boolean) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -401,14 +422,14 @@ fun ModeSelector(activeId: String, presupuestos: List<Presupuesto>, onModeChange
         Row(modifier = Modifier.fillMaxSize()) {
             SelectorItem(
                 text = "INDIVIDUAL",
-                isSelected = isIndividual,
-                onClick = { onModeChange(individualId ?: "individual_default") },
+                isSelected = isModoIndividual,
+                onClick = { onModeChange(true) },
                 modifier = Modifier.weight(1f)
             )
             SelectorItem(
                 text = "GRUPO",
-                isSelected = !isIndividual,
-                onClick = { onModeChange(familiarId ?: "familiar_default") },
+                isSelected = !isModoIndividual,
+                onClick = { onModeChange(false) },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -416,11 +437,11 @@ fun ModeSelector(activeId: String, presupuestos: List<Presupuesto>, onModeChange
 }
 
 @Composable
-fun GroupSelector(grupos: List<GroupDetailResponse>, onGroupSelected: (String) -> Unit) {
+fun GroupSelector(grupos: List<GroupDetailResponse>, selectedGroupId: String?, onGroupSelected: (String) -> Unit, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
-    val grupoActual = grupos.firstOrNull()
+    val grupoActual = grupos.find { it.id == selectedGroupId } ?: grupos.firstOrNull()
 
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = modifier.fillMaxWidth()) {
         OutlinedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),

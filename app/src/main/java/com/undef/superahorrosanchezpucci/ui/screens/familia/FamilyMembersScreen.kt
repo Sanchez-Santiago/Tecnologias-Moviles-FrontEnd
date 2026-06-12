@@ -46,8 +46,8 @@ fun FamilyMembersScreen(viewModel: FamilyViewModel, onBack: () -> Unit) {
     var inviteEmail by remember { mutableStateOf("") }
     var showCreateGroupDialog by remember { mutableStateOf(false) }
     var newGroupName by remember { mutableStateOf("") }
-    var selectedCategoria by remember { mutableStateOf("GRUPO") }
-    val categorias = listOf("GRUPO", "AMIGOS", "TRABAJO")
+    var selectedCategoria by remember { mutableStateOf("FAMILIA") }
+    val categorias = listOf("FAMILIA", "AMIGOS", "TRABAJO")
     var categoriaExpanded by remember { mutableStateOf(false) }
     var grupoExpanded by remember { mutableStateOf(false) }
     var selectedGrupoId by remember { mutableStateOf<String?>(null) }
@@ -80,6 +80,7 @@ fun FamilyMembersScreen(viewModel: FamilyViewModel, onBack: () -> Unit) {
     }
 
     val selectedGroup = grupos.find { it.id == selectedGrupoId }
+    val esIndividual = selectedGroup?.categoria == "INDIVIDUAL"
     val isAdmin = selectedGroup?.let { group ->
         usuarioActual?.let { user ->
             group.members.any { it.id == user.id && it.role == "ADMIN" }
@@ -90,13 +91,26 @@ fun FamilyMembersScreen(viewModel: FamilyViewModel, onBack: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            if (grupos.isNotEmpty() && isAdmin) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                if (grupos.isNotEmpty() && isAdmin && !esIndividual) {
+                    ExtendedFloatingActionButton(
+                        onClick = { showInviteDialog = true },
+                        containerColor = Emerald600,
+                        contentColor = Color.White,
+                        icon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
+                        text = { Text("AGREGAR MIEMBRO") },
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                }
                 ExtendedFloatingActionButton(
-                    onClick = { showInviteDialog = true },
-                    containerColor = Emerald600,
-                    contentColor = Color.White,
-                    icon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
-                    text = { Text("AGREGAR MIEMBRO") },
+                    onClick = { showCreateGroupDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("CREAR GRUPO") },
                     shape = RoundedCornerShape(24.dp)
                 )
             }

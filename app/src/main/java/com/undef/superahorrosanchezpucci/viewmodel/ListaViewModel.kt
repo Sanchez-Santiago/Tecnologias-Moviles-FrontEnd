@@ -16,6 +16,8 @@ class ListaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cambiarPresupuestoActivo(id: String) = store.cambiarPresupuestoActivo(id)
 
+    fun cambiarModo(individual: Boolean, onResult: ((Result<Unit>) -> Unit)? = null) = store.cambiarModo(individual, onResult)
+
     fun agregarProducto(listaId: String, producto: Producto) = store.agregarProducto(listaId, producto)
 
     fun eliminarProducto(listaId: String, productoId: String) = store.eliminarProducto(listaId, productoId)

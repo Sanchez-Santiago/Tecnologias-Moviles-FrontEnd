@@ -19,7 +19,7 @@ data class PurchaseResponse(
     val storeName: String? = null,
     val userId: String,
     val userName: String,
-    val total: Double,
+    val total: String,
     val notes: String? = null,
     val items: List<PurchaseProductResponse>,
     val purchaseDate: String,
@@ -31,8 +31,8 @@ data class PurchaseProductResponse(
     val productId: String,
     val productName: String,
     val quantity: Int,
-    val unitPrice: Double,
-    val subtotal: Double
+    val unitPrice: String,
+    val subtotal: String
 )
 
 data class UpdatePurchaseRequest(

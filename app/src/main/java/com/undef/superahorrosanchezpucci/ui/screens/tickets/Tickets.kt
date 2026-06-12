@@ -85,10 +85,12 @@ fun TicketsScreen(viewModel: TicketsViewModel) {
             topBar = {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
                     Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                        val isModoIndividual = presupuestoActivo?.let { active ->
+                            presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.INDIVIDUAL }?.id == active.id
+                        } ?: false
                         ModeSelector(
-                            activeId = presupuestoActivo?.id ?: "",
-                            presupuestos = presupuestos,
-                            onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
+                            isModoIndividual = isModoIndividual,
+                            onModeChange = { individual -> viewModel.cambiarModo(individual) }
                         )
                     }
                     TicketsHeader()

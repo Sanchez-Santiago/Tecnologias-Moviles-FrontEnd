@@ -155,27 +155,17 @@ fun BudgetSkeleton() {
 fun HomeSkeleton() {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .verticalScroll(rememberScrollState()),
+            .fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
-        // Mode selector skeleton
-        ShimmerBox(height = 64.dp)
-        Spacer(modifier = Modifier.height(16.dp))
         // Budget hero skeleton
         BudgetSkeleton()
-        Spacer(modifier = Modifier.height(16.dp))
         // Members skeleton
         ShimmerBox(height = 80.dp)
-        Spacer(modifier = Modifier.height(16.dp))
         // Accumulated savings skeleton
         ShimmerBox(height = 100.dp)
-        Spacer(modifier = Modifier.height(16.dp))
         // AI tip skeleton
         ShimmerBox(height = 80.dp)
-        Spacer(modifier = Modifier.height(16.dp))
         // Last purchases title
         ShimmerBox(height = 12.dp, width = 150.dp)
         repeat(3) {

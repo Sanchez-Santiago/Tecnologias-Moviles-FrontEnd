@@ -49,10 +49,7 @@ fun ListaScreen(viewModel: ListaViewModel) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     
     val presupuestoActivo = presupuestos.find { it.activo }
-    val isFamiliar = presupuestoActivo?.tipo != TipoPresupuesto.INDIVIDUAL
-    val listaActualId = if (isFamiliar) "lista-familiar" else "lista-individual"
-    
-    val listaActual = listas.find { it.id == listaActualId }
+    val listaActual = listas.find { it.presupuestoId == presupuestoActivo?.id }
     val items = listaActual?.productos ?: emptyList<Producto>()
 
     val filteredItems by remember(items, selectedFilter, searchQuery) {
@@ -79,7 +76,7 @@ fun ListaScreen(viewModel: ListaViewModel) {
         val context = LocalContext.current
         
         fun compartirLista() {
-            val lista = listas.find { it.id == listaActualId }
+            val lista = listaActual
             if (lista != null) {
                 val texto = buildString {
                     appendLine("🛒 Mi Lista de Compras: ${lista.nombre}")
@@ -114,10 +111,12 @@ fun ListaScreen(viewModel: ListaViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(modifier = Modifier.weight(1f)) {
+                            val isModoIndividual = presupuestoActivo?.let { active ->
+                                presupuestos.find { it.tipo == com.undef.superahorrosanchezpucci.data.model.TipoPresupuesto.INDIVIDUAL }?.id == active.id
+                            } ?: false
                             ModeSelector(
-                                activeId = presupuestoActivo?.id ?: "",
-                                presupuestos = presupuestos,
-                                onModeChange = { id -> viewModel.cambiarPresupuestoActivo(id) }
+                                isModoIndividual = isModoIndividual,
+                                onModeChange = { individual -> viewModel.cambiarModo(individual) }
                             )
                         }
                         IconButton(
@@ -172,10 +171,10 @@ fun ListaScreen(viewModel: ListaViewModel) {
                                 ItemCard(
                                     item = item,
                                     onCheckedChange = { _ ->
-                                        viewModel.toggleProducto(listaActualId, item.id)
+                                        listaActual?.let { viewModel.toggleProducto(it.id, item.id) }
                                     },
                                     onEdit = { editingItem = item },
-                                    onDelete = { viewModel.eliminarProducto(listaActualId, item.id) }
+                                    onDelete = { listaActual?.let { viewModel.eliminarProducto(it.id, item.id) } }
                                 )
                             }
                         }

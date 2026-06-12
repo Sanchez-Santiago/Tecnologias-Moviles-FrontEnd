@@ -16,6 +16,8 @@ class TicketsViewModel(application: Application) : AndroidViewModel(application)
 
     fun cambiarPresupuestoActivo(id: String) = store.cambiarPresupuestoActivo(id)
 
+    fun cambiarModo(individual: Boolean, onResult: ((Result<Unit>) -> Unit)? = null) = store.cambiarModo(individual, onResult)
+
     fun agregarTicket(ticket: Ticket) = store.agregarTicket(ticket)
 
     fun eliminarTicket(id: String) = store.eliminarTicket(id)

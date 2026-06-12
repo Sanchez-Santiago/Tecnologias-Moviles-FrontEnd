@@ -92,6 +92,12 @@ class AppStateStore private constructor(application: Application) {
     private val _unreadCount = MutableStateFlow(0)
     val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
 
+    private val _modoIndividual = MutableStateFlow(false)
+    val modoIndividual: StateFlow<Boolean> = _modoIndividual.asStateFlow()
+
+    private val _grupoActivoId = MutableStateFlow<String?>(null)
+    val grupoActivoId: StateFlow<String?> = _grupoActivoId.asStateFlow()
+
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -103,6 +109,7 @@ class AppStateStore private constructor(application: Application) {
     fun reload() {
         scope.launch {
             _isLoading.value = true
+            // repository.cargarTodo() ya carga el usuario, grupos, presupuestos, compras, listas, etc.
             runCatching { repository.cargarTodo() }
             runCatching { repository.loadUnreadCount() }
             refrescar()
@@ -113,8 +120,14 @@ class AppStateStore private constructor(application: Application) {
 
     fun login(email: String, password: String, onResult: (Result<Usuario>) -> Unit) {
         scope.launch {
+            _isLoading.value = true
             val result = withContext(Dispatchers.IO) { repository.login(email, password) }
-            result.onSuccess { refrescar() }
+            result.onSuccess { 
+                // Tras login exitoso, refrescar todo
+                repository.cargarTodo()
+                refrescar() 
+            }
+            _isLoading.value = false
             onResult(result)
         }
     }
@@ -128,35 +141,58 @@ class AppStateStore private constructor(application: Application) {
 
     fun agregarProducto(listaId: String, producto: Producto) {
         scope.launch {
-            val listaExiste = repository.listas.any { it.id == listaId }
-            if (!listaExiste) {
-                val nombreLista = if (listaId == "lista-familiar") "Lista Familiar" else "Lista Individual"
-                repository.agregarLista(ListaCompra(id = listaId, nombre = nombreLista))
+            // Si el ID es uno de los hardcodeados de la UI, intentamos mapearlo a la lista real del repositorio
+            val finalListaId = if (listaId == "lista-familiar" || listaId == "lista-individual") {
+                val esFamiliar = listaId == "lista-familiar"
+                repository.listas.find { it.esFamiliar == esFamiliar }?.id ?: listaId
+            } else {
+                listaId
             }
 
-            repository.agregarOActualizarProducto(listaId, producto)
+            var effectiveId = finalListaId
+            val listaExiste = repository.listas.any { it.id == finalListaId }
+            if (!listaExiste) {
+                val nombreLista = if (listaId == "lista-familiar") "Lista Familiar" else "Lista Individual"
+                val esFamiliar = listaId == "lista-familiar"
+                effectiveId = repository.agregarLista(ListaCompra(id = finalListaId, nombre = nombreLista, esFamiliar = esFamiliar))
+                refrescar()
+            }
+
+            repository.agregarOActualizarProducto(effectiveId, producto)
             refrescar()
         }
     }
 
     fun eliminarProducto(listaId: String, productoId: String) {
         scope.launch {
-            repository.eliminarProducto(listaId, productoId)
+            val finalId = if (listaId == "lista-familiar" || listaId == "lista-individual") {
+                val esFamiliar = listaId == "lista-familiar"
+                repository.listas.find { it.esFamiliar == esFamiliar }?.id ?: listaId
+            } else listaId
+            repository.eliminarProducto(finalId, productoId)
             refrescar()
         }
     }
 
     fun toggleProducto(listaId: String, productoId: String) {
         scope.launch {
-            repository.toggleProducto(listaId, productoId)
+            val finalId = if (listaId == "lista-familiar" || listaId == "lista-individual") {
+                val esFamiliar = listaId == "lista-familiar"
+                repository.listas.find { it.esFamiliar == esFamiliar }?.id ?: listaId
+            } else listaId
+            repository.toggleProducto(finalId, productoId)
             refrescar()
         }
     }
 
     fun actualizarPresupuesto(id: String, monto: Int) {
         scope.launch {
+            // 1. Actualización local rápida
             repository.actualizarPresupuesto(id, monto)
-            refrescar()
+            refrescar() 
+            
+            // 2. Sincronización asíncrona con la API
+            launch { repository.sincronizarPresupuesto(id) }
         }
     }
 
@@ -277,8 +313,20 @@ class AppStateStore private constructor(application: Application) {
 
     fun cambiarGrupoActivo(grupoId: String) {
         scope.launch {
+            _isLoading.value = true
             repository.cambiarGrupoActivo(grupoId)
             refrescar()
+            _isLoading.value = false
+        }
+    }
+
+    fun cambiarModo(individual: Boolean, onResult: ((Result<Unit>) -> Unit)? = null) {
+        scope.launch {
+            _isLoading.value = true
+            val result = repository.switchModo(individual)
+            refrescar()
+            _isLoading.value = false
+            onResult?.invoke(result)
         }
     }
 
@@ -359,11 +407,13 @@ class AppStateStore private constructor(application: Application) {
         _tickets.value = repository.tickets.toList()
         _usuarios.value = repository.usuarios.toList()
         _usuarioActual.value = repository.usuarioActual
-        _grupos.value = repository.grupos.toList()
+        _grupos.value = repository.gruposVisibles.toList()
         _invitaciones.value = repository.invitaciones.toList()
         _notifications.value = repository.notifications.toList()
         _unreadCount.value = repository.unreadCount
         _offers.value = repository.offers.toList()
+        _modoIndividual.value = repository.modoIndividual
+        _grupoActivoId.value = if (repository.modoIndividual) repository.grupoIndividualId else repository.grupoRegularActivoId
     }
 
     companion object {
