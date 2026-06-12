@@ -12,6 +12,8 @@ class StatsRepository(private val apiService: ApiService) {
     suspend fun getSpendingByImportance(groupId: String) = safeApiCall { apiService.getSpendingByImportance(groupId) }
     suspend fun getMonthlySummary(groupId: String) = safeApiCall { apiService.getMonthlySummary(groupId) }
     suspend fun getMostFrequentStore(groupId: String) = safeApiCall { apiService.getMostFrequentStore(groupId) }
+    suspend fun getMostPurchasedProducts(groupId: String) = safeApiCall { apiService.getMostPurchasedProducts(groupId) }
+    suspend fun getMemberSpending(groupId: String) = safeApiCall { apiService.getMemberSpending(groupId) }
 
     private suspend fun <T> safeApiCall(call: suspend () -> retrofit2.Response<ApiResponse<T>>): Result<T> = withContext(Dispatchers.IO) {
         try {

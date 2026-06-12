@@ -6,6 +6,7 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 data class Ticket(
     val id: String,
+    val groupId: String = "",
     val supermercado: String,
     val direccion: String,
     val fechaHora: Long,

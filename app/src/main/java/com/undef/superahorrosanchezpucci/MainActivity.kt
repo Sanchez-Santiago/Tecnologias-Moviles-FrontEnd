@@ -100,7 +100,7 @@ fun MainScreen() {
                 val listaViewModel: ListaViewModel = viewModel()
                 ListaScreen(listaViewModel)
             }
-            composable("NUEVA_COMPRA") { NuevaCompraScreen(navController) }
+            composable("NUEVA_COMPRA") { NuevaCompraScreen(navController, ticketsViewModel) }
             composable("DETALLE_COMPRA/{compraId}") { backStackEntry ->
                 val compraId = backStackEntry.arguments?.getString("compraId") ?: ""
                 val compra = ticketsState.find { it.id == compraId }

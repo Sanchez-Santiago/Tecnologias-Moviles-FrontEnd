@@ -24,6 +24,8 @@ class TicketsViewModel(application: Application) : AndroidViewModel(application)
 
     fun actualizarTicket(ticket: Ticket) = store.actualizarTicket(ticket)
 
+    suspend fun buscarEnCatalogo(query: String) = store.buscarEnCatalogo(query)
+
     suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
         return store.analizarTicketImagen(imageBytes, mimeType)
     }

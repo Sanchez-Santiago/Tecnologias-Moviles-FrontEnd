@@ -100,13 +100,15 @@ fun HomeScreen(
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            item {
-                GroupSelector(
-                    grupos = grupos,
-                    selectedGroupId = grupoActivoId,
-                    onGroupSelected = { grupoId -> viewModel.cambiarGrupoActivo(grupoId) },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            if (!isModoIndividual) {
+                item {
+                    GroupSelector(
+                        grupos = grupos,
+                        selectedGroupId = grupoActivoId,
+                        onGroupSelected = { grupoId -> viewModel.cambiarGrupoActivo(grupoId) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
             
             if (isLoading) {

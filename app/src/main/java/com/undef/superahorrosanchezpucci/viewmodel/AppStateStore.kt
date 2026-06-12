@@ -103,15 +103,25 @@ class AppStateStore private constructor(application: Application) {
 
     init {
         AuthSessionStore.initialize(application.applicationContext)
+        repository.onDataChanged = { refrescar() }
         reload()
     }
 
     fun reload() {
         scope.launch {
             _isLoading.value = true
-            // repository.cargarTodo() ya carga el usuario, grupos, presupuestos, compras, listas, etc.
+            // El primer refresco vendrá del onDataChanged cuando se cargue el caché en cargarTodo()
+            repository.onDataChanged = { 
+                refrescar()
+                // Una vez que tenemos datos (aunque sean de caché), quitamos el skeleton para mayor velocidad
+                if (repository.presupuestos.isNotEmpty() || repository.listas.isNotEmpty()) {
+                    _isLoading.value = false
+                }
+            }
+            
             runCatching { repository.cargarTodo() }
             runCatching { repository.loadUnreadCount() }
+
             refrescar()
             _themeMode.value = repository.themeMode
             _isLoading.value = false
@@ -390,6 +400,10 @@ class AppStateStore private constructor(application: Application) {
 
     suspend fun analizarTicketImagen(imageBytes: ByteArray, mimeType: String): TicketImageAnalysis {
         return repository.analizarTicketImagen(imageBytes, mimeType)
+    }
+
+    suspend fun buscarEnCatalogo(query: String): List<com.undef.superahorrosanchezpucci.data.local.CatalogoProductoEntity> {
+        return repository.buscarEnCatalogo(query)
     }
 
     fun getEstimadosPorCategoria(listaId: String): Map<Categoria, Int> {

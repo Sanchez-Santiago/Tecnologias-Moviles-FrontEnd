@@ -79,6 +79,12 @@ interface ApiService {
     @GET("api/statistics/group/{groupId}/most-frequent-store")
     suspend fun getMostFrequentStore(@Path("groupId") groupId: String): Response<ApiResponse<List<StoreFrequency>>>
 
+    @GET("api/statistics/group/{groupId}/most-purchased-products")
+    suspend fun getMostPurchasedProducts(@Path("groupId") groupId: String): Response<ApiResponse<List<MostPurchasedProduct>>>
+
+    @GET("api/statistics/group/{groupId}/member-spending")
+    suspend fun getMemberSpending(@Path("groupId") groupId: String): Response<ApiResponse<List<MemberSpending>>>
+
     @GET("api/statistics/group/{groupId}/budget-progress")
     suspend fun getBudgetProgress(@Path("groupId") groupId: String): Response<ApiResponse<List<BudgetProgress>>>
 

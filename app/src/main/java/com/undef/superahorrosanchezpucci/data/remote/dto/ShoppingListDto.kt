@@ -15,8 +15,14 @@ data class ShoppingListProductResponse(
     val productId: String,
     val productName: String,
     val checked: Boolean = false,
-    val finalPrice: Double? = null,
-    val finalQuantity: Double? = null,
+    val finalPrice: Any? = null,
+    val unitPrice: Any? = null,
+    val price: Any? = null,
+    val productPrice: Any? = null,
+    val totalPrice: Any? = null,
+    val subtotal: Any? = null,
+    val finalQuantity: Any? = null,
+    val quantity: Any? = null,
     val notes: String? = null
 )
 

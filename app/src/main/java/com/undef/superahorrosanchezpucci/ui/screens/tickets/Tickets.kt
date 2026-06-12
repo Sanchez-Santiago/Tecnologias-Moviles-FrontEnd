@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,8 +68,10 @@ fun TicketsScreen(viewModel: TicketsViewModel) {
     val allTickets by viewModel.tickets.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     
-    val presupuestoActivo = presupuestos.find { it.activo }
-    val tickets = allTickets.filter { it.presupuestoId == presupuestoActivo?.id }
+    val presupuestoActivo = presupuestos.find { it.activo } ?: presupuestos.firstOrNull()
+    val tickets = allTickets.filter { 
+        it.presupuestoId == presupuestoActivo?.id || it.presupuestoId.isBlank()
+    }
 
     val filteredTickets = tickets.filter { ticket ->
         ticket.supermercado.contains(searchQuery, ignoreCase = true) ||
@@ -587,6 +590,17 @@ fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = n
         }
     }
 
+    var productSuggestions by remember { mutableStateOf<List<com.undef.superahorrosanchezpucci.data.local.CatalogoProductoEntity>>(emptyList()) }
+    var showProductSuggestions by remember { mutableStateOf(false) }
+
+    LaunchedEffect(productName) {
+        if (productName.length >= 2 && showProductSuggestions) {
+            productSuggestions = viewModel.buscarEnCatalogo(productName)
+        } else {
+            productSuggestions = emptyList()
+        }
+    }
+
     fun addProductToTicket() {
         val cleanProductPrice = parsePriceInput(productPrice)
         val cleanQuantity = productQuantity.filter { it.isDigit() }.toIntOrNull() ?: 1
@@ -602,6 +616,7 @@ fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = n
         productName = ""
         productPrice = ""
         productQuantity = "1"
+        showProductSuggestions = false
     }
     
     // Helper function to save bitmap to gallery (must be called from non-composable context)
@@ -835,12 +850,43 @@ fun RegisterPurchaseModal(viewModel: TicketsViewModel, ticketToEdit: Ticket? = n
                             letterSpacing = 1.5.sp
                         )
                     )
-                    ModalTextField(
-                        value = productName,
-                        onValueChange = { productName = it },
-                        placeholder = "Producto",
-                        leadingIcon = Icons.Default.Inventory
-                    )
+                    Box {
+                        ModalTextField(
+                            value = productName,
+                            onValueChange = { 
+                                productName = it
+                                showProductSuggestions = true
+                            },
+                            placeholder = "Producto",
+                            leadingIcon = Icons.Default.Inventory
+                        )
+                        
+                        if (productSuggestions.isNotEmpty() && showProductSuggestions) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 60.dp)
+                                    .heightIn(max = 200.dp)
+                                    .zIndex(1f),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                    productSuggestions.forEach { suggestion ->
+                                        ListItem(
+                                            headlineContent = { Text(suggestion.name) },
+                                            supportingContent = { Text(suggestion.categoryName) },
+                                            modifier = Modifier.clickable {
+                                                productName = suggestion.name
+                                                productPrice = suggestion.price.toInt().toString()
+                                                showProductSuggestions = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ModalTextField(
                             value = productPrice,

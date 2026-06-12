@@ -2,6 +2,7 @@ package com.undef.superahorrosanchezpucci.data.model
 
 data class ListaCompra(
     val id: String,
+    val groupId: String = "",
     val nombre: String,
     val presupuestoId: String = "",
     val esFamiliar: Boolean = false,

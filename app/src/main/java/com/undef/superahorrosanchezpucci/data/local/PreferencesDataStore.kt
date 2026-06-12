@@ -16,6 +16,8 @@ class PreferencesDataStore(private val context: Context) {
 
     companion object {
         private val THEME_MODE = stringPreferencesKey("theme_mode")
+        private val INDIVIDUAL_GROUP_ID = stringPreferencesKey("individual_group_id")
+        private val ACTIVE_GROUP_ID = stringPreferencesKey("active_group_id")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
@@ -27,9 +29,19 @@ class PreferencesDataStore(private val context: Context) {
         }
     }
 
+    val individualGroupIdFlow: Flow<String?> = context.dataStore.data.map { it[INDIVIDUAL_GROUP_ID] }
+    val activeGroupIdFlow: Flow<String?> = context.dataStore.data.map { it[ACTIVE_GROUP_ID] }
+
     suspend fun saveThemeMode(mode: ThemeMode) {
         context.dataStore.edit { prefs ->
             prefs[THEME_MODE] = mode.name
+        }
+    }
+
+    suspend fun saveGroupIds(individual: String?, active: String?) {
+        context.dataStore.edit { prefs ->
+            if (individual != null) prefs[INDIVIDUAL_GROUP_ID] = individual
+            if (active != null) prefs[ACTIVE_GROUP_ID] = active
         }
     }
 }

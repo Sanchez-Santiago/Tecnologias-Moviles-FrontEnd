@@ -1,49 +1,64 @@
 package com.undef.superahorrosanchezpucci.data.repository
 
 import android.util.Log
-import com.undef.superahorrosanchezpucci.data.local.AppDao
-import com.undef.superahorrosanchezpucci.data.local.ListaCompraEntity
-import com.undef.superahorrosanchezpucci.data.local.ProductoEntity
-import com.undef.superahorrosanchezpucci.data.model.Categoria
+import com.undef.superahorrosanchezpucci.data.local.*
 import com.undef.superahorrosanchezpucci.data.model.ListaCompra
 import com.undef.superahorrosanchezpucci.data.model.Producto
 import com.undef.superahorrosanchezpucci.data.remote.ApiService
 import com.undef.superahorrosanchezpucci.data.remote.dto.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 class ShoppingListRepository(
     private val apiService: ApiService,
     private val appDao: AppDao
 ) {
+    /**
+     * Obtiene las listas de compras. 
+     * Implementa una estrategia de "Local First": Primero devuelve lo que hay en Room 
+     * y luego intenta actualizar desde la API en segundo plano.
+     */
     suspend fun getShoppingLists(groupId: String, presupuestoId: String, modoIndividual: Boolean): List<ListaCompra> = withContext(Dispatchers.IO) {
+        // Intentar obtener de la API para refrescar la caché
         try {
             val response = apiService.getShoppingLists(groupId)
             if (response.isSuccessful && response.body()?.success == true) {
                 val apiLists = response.body()?.data ?: emptyList()
-                val lists = apiLists.map { it.toModel(presupuestoId, !modoIndividual) }
                 
-                appDao.clearListas()
-                appDao.insertListas(lists.map { it.toEntity() })
-                lists.forEach { list ->
-                    appDao.deleteProductosByListaId(list.id)
-                    appDao.insertProductos(list.productos.map { it.toEntity(list.id) })
+                // Logging para verificar datos (como un curl)
+                Log.d("ShoppingListRepo", "API Response for group $groupId: ${apiLists.size} lists")
+                apiLists.forEach { list ->
+                    Log.d("ShoppingListRepo", "List: ${list.name}, Products: ${list.products.size}")
+                    list.products.forEach { p ->
+                        Log.d("ShoppingListRepo", "  - Product: ${p.productName}, FinalPrice: ${p.finalPrice}, UnitPrice: ${p.unitPrice}, Price: ${p.price}, Subtotal: ${p.subtotal}")
+                    }
                 }
+
+                val lists = apiLists.map { it.toModel(groupId, presupuestoId, !modoIndividual) }
+                
+                // Actualizar Room
+                appDao.refreshListas(lists.map { it.toEntity() }, lists.flatMap { it.productos.map { p -> p.toEntity(it.id) } })
+                
                 return@withContext lists
+            } else {
+                Log.e("ShoppingListRepo", "API Error: ${response.code()} ${response.errorBody()?.string()}")
             }
         } catch (e: Exception) {
-            Log.e("ListRepo", "Error fetching lists", e)
+            Log.e("ShoppingListRepo", "Error fetching from API, falling back to cache", e)
         }
-        appDao.getListas().map { it.toModel(appDao.getProductosByListaId(it.id).map { p -> p.toModel() }) }
+
+        // Si falla la API, devolvemos lo que hay en Room filtrado por grupo
+        appDao.getListas()
+            .filter { it.groupId == groupId }
+            .map { entity ->
+                entity.toModel(appDao.getProductosByListaId(entity.id).map { it.toModel() })
+            }
     }
 
     suspend fun createList(groupId: String, name: String): String? = withContext(Dispatchers.IO) {
         try {
             val response = apiService.createShoppingList(CreateShoppingListRequest(groupId, name))
             if (response.isSuccessful) return@withContext response.body()?.data?.id
-            else Log.e("ListRepo", "Error creating list: ${response.errorBody()?.string()}")
         } catch (e: Exception) {
             Log.e("ListRepo", "Exception creating list", e)
         }
@@ -52,22 +67,30 @@ class ShoppingListRepository(
 
     suspend fun syncProduct(listaId: String, producto: Producto, isNew: Boolean, productCatalogId: String?) = withContext(Dispatchers.IO) {
         if (productCatalogId == null) {
-            Log.w("ListRepo", "Cannot sync product ${producto.nombre}: No catalog ID found")
+            Log.w("ShoppingListRepo", "No se puede sincronizar '${producto.nombre}' porque no se encontró en el catálogo (ID nulo)")
             return@withContext
         }
         
         try {
-                val response = if (isNew) {
-                    apiService.addProductToList(listaId, AddProductRequest(productCatalogId, producto.cantidad.toDouble()))
-                } else {
-                    val effectiveProdId = if (producto.id.length < 30) productCatalogId else producto.id
-                    apiService.updateProductInList(listaId, effectiveProdId, UpdateProductRequest(producto.comprado, producto.precioEstimado.toDouble(), producto.cantidad.toDouble()))
-                }
+            Log.d("ShoppingListRepo", "Sincronizando '${producto.nombre}' con la API. isNew: $isNew, catalogId: $productCatalogId")
+            if (isNew) {
+                val response = apiService.addProductToList(listaId, AddProductRequest(productCatalogId, producto.cantidad.toDouble()))
                 if (!response.isSuccessful) {
-                    Log.e("ListRepo", "Error syncing product ${producto.nombre}: ${response.errorBody()?.string()}")
+                    Log.e("ShoppingListRepo", "Error al agregar producto: ${response.code()} ${response.errorBody()?.string()}")
                 }
+            } else {
+                val effectiveProdId = if (producto.id.length < 30) productCatalogId else producto.id
+                val response = apiService.updateProductInList(listaId, effectiveProdId, UpdateProductRequest(
+                    checked = producto.comprado,
+                    finalPrice = producto.precio.toDouble(),
+                    finalQuantity = producto.cantidad.toDouble()
+                ))
+                if (!response.isSuccessful) {
+                    Log.e("ShoppingListRepo", "Error al actualizar producto: ${response.code()} ${response.errorBody()?.string()}")
+                }
+            }
         } catch (e: Exception) {
-            Log.e("ListRepo", "Error syncing product ${producto.nombre}", e)
+            Log.e("ShoppingListRepo", "Excepción al sincronizar producto ${producto.nombre}", e)
         }
     }
 
@@ -84,34 +107,4 @@ class ShoppingListRepository(
         appDao.deleteProductosByListaId(listaId)
         appDao.insertProductos(productos.map { it.toEntity(listaId) })
     }
-
-    // Mappings
-    private fun ShoppingListResponse.toModel(presupuestoId: String, esFamiliar: Boolean) = ListaCompra(
-        id = id, nombre = name, presupuestoId = presupuestoId, esFamiliar = esFamiliar,
-        fechaCreacion = parseDate(createdAt), total = products.sumOf { (it.finalPrice ?: 0.0) * (it.finalQuantity ?: 1.0) }.toInt(),
-        productos = products.map { it.toModel() }.toMutableList()
-    )
-
-    private fun ShoppingListProductResponse.toModel() = Producto(
-        id = id, nombre = productName, codigo = productId, precio = (finalPrice ?: 0.0).toInt(),
-        precioEstimado = (finalPrice ?: 0.0).toInt(), cantidad = (finalQuantity ?: 1.0).toInt(),
-        comprado = checked, categoria = Categoria.ESENCIAL
-    )
-
-    private fun ListaCompraEntity.toModel(productos: List<Producto>) = ListaCompra(
-        id, nombre, presupuestoId, esFamiliar, fechaCreacion, hora, supermercado, total, productos.toMutableList()
-    )
-
-    private fun ProductoEntity.toModel() = Producto(
-        id, codigo, nombre, descripcion, precio, marca, precioEstimado, precioReal, cantidad, comprado,
-        try { Categoria.valueOf(categoria) } catch (_: Exception) { Categoria.ESENCIAL }
-    )
-
-    private fun ListaCompra.toEntity() = ListaCompraEntity(id, nombre, presupuestoId, esFamiliar, fechaCreacion, hora, supermercado, total)
-    private fun Producto.toEntity(listaId: String) = ProductoEntity(id, listaId, codigo, nombre, descripcion, precio, marca, precioEstimado, precioReal, cantidad, comprado, categoria.name)
-
-    private fun parseDate(date: String): Long = try {
-        LocalDateTime.parse(date, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-            .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-    } catch (_: Exception) { System.currentTimeMillis() }
 }

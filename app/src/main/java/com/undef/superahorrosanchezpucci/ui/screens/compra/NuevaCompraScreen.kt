@@ -58,7 +58,7 @@ private data class ProductoCompraDraft(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NuevaCompraScreen(navController: NavController) {
+fun NuevaCompraScreen(navController: NavController, viewModel: com.undef.superahorrosanchezpucci.viewmodel.TicketsViewModel) {
     var fecha by remember { mutableStateOf("") }
     var hora by remember { mutableStateOf("") }
     var supermercado by remember { mutableStateOf("") }
@@ -75,9 +75,7 @@ fun NuevaCompraScreen(navController: NavController) {
     }
 
     fun validarFormulario(): Boolean {
-        return fecha.isNotBlank() &&
-            hora.isNotBlank() &&
-            supermercado.isNotBlank() &&
+        return supermercado.isNotBlank() &&
             productos.isNotEmpty() &&
             productos.all { it.nombre.isNotBlank() && it.precio.filter { char -> char.isDigit() }.toIntOrNull() != null }
     }
@@ -197,10 +195,28 @@ fun NuevaCompraScreen(navController: NavController) {
                 Button(
                     onClick = {
                         if (validarFormulario()) {
+                            val ticket = com.undef.superahorrosanchezpucci.data.model.Ticket(
+                                id = "",
+                                supermercado = supermercado,
+                                direccion = "",
+                                fechaHora = System.currentTimeMillis(), // O parsear fecha/hora si se desea
+                                total = total,
+                                metodoPago = com.undef.superahorrosanchezpucci.data.model.MetodoPago.EFECTIVO,
+                                imagenPath = "",
+                                presupuestoId = "",
+                                productos = productos.map { 
+                                    com.undef.superahorrosanchezpucci.data.model.TicketProducto(
+                                        nombre = it.nombre,
+                                        precio = it.precio.toIntOrNull() ?: 0,
+                                        cantidad = 1
+                                    )
+                                }
+                            )
+                            viewModel.agregarTicket(ticket)
                             navController.popBackStack()
                         } else {
                             scope.launch {
-                                snackbarHostState.showSnackbar("Completá fecha, hora, supermercado y productos con precio.")
+                                snackbarHostState.showSnackbar("Completá supermercado y productos con precio.")
                             }
                         }
                     },

@@ -23,4 +23,6 @@ class ListaViewModel(application: Application) : AndroidViewModel(application) {
     fun eliminarProducto(listaId: String, productoId: String) = store.eliminarProducto(listaId, productoId)
 
     fun toggleProducto(listaId: String, productoId: String) = store.toggleProducto(listaId, productoId)
+
+    suspend fun buscarEnCatalogo(query: String) = store.buscarEnCatalogo(query)
 }

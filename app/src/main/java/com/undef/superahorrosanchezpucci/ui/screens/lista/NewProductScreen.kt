@@ -40,6 +40,7 @@ import java.util.*
 @Composable
 fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, onClose: () -> Unit) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var name by remember { mutableStateOf(itemToEdit?.nombre ?: "") }
     var code by remember { mutableStateOf(itemToEdit?.codigo ?: "") }
     var brand by remember { mutableStateOf(itemToEdit?.marca ?: "") }
@@ -49,8 +50,19 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
     var quantity by remember { mutableIntStateOf(itemToEdit?.cantidad ?: 1) }
     val presupuestos by viewModel.presupuestos.collectAsStateWithLifecycle()
     
+    var suggestions by remember { mutableStateOf<List<com.undef.superahorrosanchezpucci.data.local.CatalogoProductoEntity>>(emptyList()) }
+    var showSuggestions by remember { mutableStateOf(false) }
+
     var nameError by remember { mutableStateOf<String?>(null) }
     var priceError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(name) {
+        if (name.length >= 2 && showSuggestions) {
+            suggestions = viewModel.buscarEnCatalogo(name)
+        } else {
+            suggestions = emptyList()
+        }
+    }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -102,7 +114,7 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.8f))
-            .clickable(enabled = false) { }
+            .clickable { onClose() }
     ) {
         Column(
             modifier = Modifier
@@ -112,6 +124,7 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
                 .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
+                .clickable(enabled = false) { }
                 .padding(32.dp)
         ) {
             // Header
@@ -172,15 +185,44 @@ fun NewProductScreen(viewModel: ListaViewModel, itemToEdit: Producto? = null, on
                 }
 
                 FormField(label = "Nombre del Producto *") {
-                    CustomTextField(
-                        value = name,
-                        onValueChange = { 
-                            name = it
-                            if (it.isNotBlank()) nameError = null
-                        },
-                        placeholder = "Ej: Leche deslactosada",
-                        leadingIcon = Icons.Default.Inventory
-                    )
+                    Box {
+                        CustomTextField(
+                            value = name,
+                            onValueChange = { 
+                                name = it
+                                showSuggestions = true
+                                if (it.isNotBlank()) nameError = null
+                            },
+                            placeholder = "Ej: Leche deslactosada",
+                            leadingIcon = Icons.Default.Inventory
+                        )
+                        
+                        if (suggestions.isNotEmpty() && showSuggestions) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 60.dp)
+                                    .heightIn(max = 200.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                    suggestions.forEach { suggestion ->
+                                        ListItem(
+                                            headlineContent = { Text(suggestion.name) },
+                                            supportingContent = { Text(suggestion.categoryName) },
+                                            modifier = Modifier.clickable {
+                                                name = suggestion.name
+                                                code = suggestion.barcode ?: ""
+                                                price = suggestion.price.toInt().toString()
+                                                showSuggestions = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

@@ -7,6 +7,7 @@ import androidx.room.Index
 @Entity(tableName = "presupuestos")
 data class PresupuestoEntity(
     @PrimaryKey val id: String,
+    val groupId: String,
     val tipo: String,
     val nombre: String,
     val montoTotal: Int,
@@ -19,6 +20,7 @@ data class PresupuestoEntity(
 @Entity(tableName = "listas")
 data class ListaCompraEntity(
     @PrimaryKey val id: String,
+    val groupId: String,
     val nombre: String,
     val presupuestoId: String,
     val esFamiliar: Boolean,
@@ -47,6 +49,7 @@ data class ProductoEntity(
 @Entity(tableName = "tickets")
 data class TicketEntity(
     @PrimaryKey val id: String,
+    val groupId: String,
     val supermercado: String,
     val direccion: String,
     val fechaHora: Long,

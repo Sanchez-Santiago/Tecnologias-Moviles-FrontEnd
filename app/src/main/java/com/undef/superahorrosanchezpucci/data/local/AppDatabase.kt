@@ -20,7 +20,7 @@ import androidx.room.RoomDatabase
         NotificationCacheEntity::class,
         OfferCacheEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
